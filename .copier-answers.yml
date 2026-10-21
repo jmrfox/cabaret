@@ -1,0 +1,8 @@
+# Changes here will be overwritten by Copier; do not edit manually.
+_commit: v0.1.0
+_src_path: C:/Users/MainUser/Documents/Repos/sci-python-template
+author_email: jfox@sdsu.edu
+author_name: Jordan M. R. Fox
+description: Cable morphologies from voxels
+package_name: camovox
+python_version: '3.12'

@@ -1,0 +1,5 @@
+"""Cable morphologies from voxels."""
+
+from importlib.metadata import version
+
+__version__ = version("camovox")
