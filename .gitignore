@@ -24,3 +24,6 @@ data/*
 .DS_Store
 Thumbs.db
 .idea/
+
+# fTetWild writes this to the working directory
+__tracked_surface.stl
