@@ -2,6 +2,18 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-23: Tree fitting with Biopython neighbor-joining + NNLS (plan 005)
+**Context:** Tree realization needs a tree topology from port distances,
+plus non-negative branch resistances.
+**Decision:**
+- Add `biopython` for `DistanceTreeConstructor().nj` (topology only). It is
+  pure Python and standard.
+- Refit branch resistances with `scipy.optimize.nnls` over all port pairs,
+  because neighbor-joining can return negative branch lengths.
+
+Rejected: scikit-bio (heavier compiled dependencies for the same algorithm);
+hand-written neighbor-joining.
+
 ## 2026-10-23: Neck ports from contact with the cell mesh
 **Context:** The TS meshes have no cut face at their neck points: the
 points sit on the spine surface, and plane cross-sections were unstable.

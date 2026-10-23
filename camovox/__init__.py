@@ -2,7 +2,7 @@
 
 from importlib.metadata import version
 
-from camovox import graft, ports, viz
+from camovox import graft, ports, reduce, viz
 from camovox.circuit import (
     CompartmentGraph,
     PortSolver,
@@ -53,6 +53,7 @@ __all__ = [
     "point_port",
     "port_impedance",
     "ports",
+    "reduce",
     "sample_uniform",
     "sites_from_points",
     "solve_dc",

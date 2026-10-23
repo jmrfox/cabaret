@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     import matplotlib.axes
     import pyvista as pv
 
+    from camovox.reduce import PortTree
+
 
 def to_pyvista(
     tets: TetMesh,
@@ -114,6 +116,7 @@ def plot_surface(
     clim: Sequence[float] | None = None,
     show_edges: bool = False,
     opacity: float = 1.0,
+    categories: bool = False,
     plotter: "pv.Plotter | None" = None,
     off_screen: bool | None = None,
 ) -> "pv.Plotter":
@@ -135,6 +138,8 @@ def plot_surface(
         Fixed colour limits (keep them fixed across frames of an animation).
     show_edges : bool
     opacity : float
+    categories : bool
+        Treat ``scalars`` as integer labels with one discrete colour each.
     plotter : pyvista.Plotter, optional
         Add to an existing plotter instead of creating one.
     off_screen : bool, optional
@@ -150,6 +155,9 @@ def plot_surface(
         pl.add_mesh(surf, color="lightgray", show_edges=show_edges, opacity=opacity)
         return pl
     surf = _surface(to_pyvista(tets, point_data={name: scalars}))
+    bar = _bar(surf.point_data[name], name, log_scale)
+    if categories:
+        bar["fmt"] = "%.0f"
     pl.add_mesh(
         surf,
         scalars=name,
@@ -158,7 +166,8 @@ def plot_surface(
         clim=clim,
         show_edges=show_edges,
         opacity=opacity,
-        scalar_bar_args=_bar(surf.point_data[name], name, log_scale),
+        categories=categories,
+        scalar_bar_args=bar,
     )
     return pl
 
@@ -444,6 +453,87 @@ def plot_mesh_quality(
     )
     _ghost(pl, tets)
     return pl
+
+
+def plot_port_tree(
+    tree: "PortTree",
+    labels: Sequence[str],
+    colors: Sequence[float] | None = None,
+    root: int = 0,
+    ax: "matplotlib.axes.Axes | None" = None,
+) -> "matplotlib.axes.Axes":
+    """Draw a resistor tree radially around a root port.
+
+    The root (e.g. the neck) sits at the centre. Each node's distance from the
+    centre is its **resistance from the root** (MΩ, the axis scale), so
+    electrically remote synapses sit far out. Subtrees get angular sectors in
+    proportion to their number of ports, so branches never cross.
+
+    Parameters
+    ----------
+    tree : camovox.reduce.PortTree
+    labels : sequence of str
+        One label per port, in port order.
+    colors : sequence of float, optional
+        One value per port for the dot colour (e.g. lobe), drawn with tab10.
+    root : int
+        Port index placed at the centre.
+    ax : matplotlib.axes.Axes, optional
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    import matplotlib.pyplot as plt
+    import networkx as nx
+
+    g = tree.graph()
+    r0 = int(tree.port_node[root])
+    dist = nx.single_source_dijkstra_path_length(g, r0, weight="resistance")
+    children = nx.bfs_tree(g, r0)
+    is_port = np.zeros(tree.n_nodes, dtype=bool)
+    is_port[tree.port_node] = True
+    leaves = {
+        v: max(1, sum(is_port[u] for u in nx.descendants(children, v) | {v})) for v in g
+    }
+    angle: dict[int, float] = {r0: 0.0}
+
+    def place(v: int, lo: float, hi: float) -> None:
+        angle[v] = 0.5 * (lo + hi)
+        kids = list(children.successors(v))
+        total = sum(leaves[k] for k in kids) or 1
+        start = lo
+        for k in kids:
+            span = (hi - lo) * leaves[k] / total
+            place(k, start, start + span)
+            start += span
+
+    place(r0, 0.0, 2 * np.pi)
+    angle[r0] = 0.0
+    pos = {
+        v: (dist[v] / 1e6 * np.cos(angle[v]), dist[v] / 1e6 * np.sin(angle[v]))
+        for v in g
+    }
+    if ax is None:
+        _, ax = plt.subplots(figsize=(7, 7))
+    for a, b in g.edges:
+        ax.plot(*zip(pos[a], pos[b], strict=True), color="gray", lw=1, zorder=1)
+    internal = [v for v in g if not is_port[v]]
+    ax.scatter(*np.array([pos[v] for v in internal]).T, s=8, color="gray", zorder=2)
+    port_nodes = [int(v) for v in tree.port_node]
+    xy = np.array([pos[v] for v in port_nodes])
+    c = (
+        None
+        if colors is None
+        else [f"C{int(x) % 10}" if x >= 0 else "k" for x in colors]
+    )
+    ax.scatter(xy[:, 0], xy[:, 1], s=60, c=c, zorder=3)
+    for (x, y), text in zip(xy, labels, strict=True):
+        ax.annotate(text, (x, y), fontsize=7, xytext=(3, 3), textcoords="offset points")
+    ax.set_aspect("equal")
+    ax.set_xlabel("MΩ from the root")
+    ax.set_ylabel("MΩ from the root")
+    return ax
 
 
 def plot_profile(

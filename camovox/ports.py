@@ -287,3 +287,48 @@ def electrical_groups(z: ArrayLike, n_groups: int) -> NDArray[np.int64]:
     _, first = np.unique(lab, return_index=True)
     order = {old: new for new, old in enumerate(lab[np.sort(first)])}
     return np.array([order[x] for x in lab], dtype=np.int64)
+
+
+def diag_lowrank_bound(z: ArrayLike, n_iter: int = 300) -> NDArray[np.float64]:
+    """Relative error of the best "diagonal + rank m" fit to a port matrix.
+
+    Models ``Z ≈ D + L Lᵀ`` with D diagonal and non-negative, and L of rank m.
+    D stands for each port's private series resistance (e.g. the spreading
+    resistance of its synapse patch, which a reduced model represents as one
+    resistor per synapse). L Lᵀ is the structure shared through m
+    compartments. This is a fairer floor than :func:`rank_bound`, which
+    charges a full compartment for every private term.
+
+    The fit alternates between the best rank-m part given D (top
+    eigenvectors) and the best D given that part (principal-axis factor
+    analysis). The result is a local optimum, so it is an estimate of the
+    bound, not a certified one.
+
+    Parameters
+    ----------
+    z : (P, P) array_like of float
+        Real, symmetric port matrix (e.g. DC, neck clamped).
+    n_iter : int
+        Alternating iterations per rank.
+
+    Returns
+    -------
+    (P + 1,) ndarray of float
+        ``err[m]`` for m = 0 … P.
+    """
+    z = np.asarray(z, dtype=float)
+    z = 0.5 * (z + z.T)
+    norm = np.linalg.norm(z)
+    p = len(z)
+    err = np.zeros(p + 1)
+    for m in range(p + 1):
+        d = np.zeros(p) if m else np.clip(np.diag(z), 0.0, None)
+        low = np.zeros_like(z)
+        for _ in range(n_iter if 0 < m < p else 1):
+            vals, vecs = np.linalg.eigh(z - np.diag(d))
+            top = np.argsort(vals)[::-1][:m]
+            keep = np.clip(vals[top], 0.0, None)
+            low = (vecs[:, top] * keep) @ vecs[:, top].T
+            d = np.clip(np.diag(z - low), 0.0, None)
+        err[m] = np.linalg.norm(z - np.diag(d) - low) / norm
+    return err

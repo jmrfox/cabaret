@@ -6,6 +6,7 @@ readme = "README.md"
 authors = [{ name = "Jordan M. R. Fox", email = "jfox@sdsu.edu" }]
 requires-python = ">=3.12"
 dependencies = [
+    "biopython>=1.88",
     "jaxley>=0.14,<0.15",
     "matplotlib>=3.11.2",
     "numpy",
