@@ -10,6 +10,7 @@ dependencies = [
     "jaxley>=0.14,<0.15",
     "matplotlib>=3.11.2",
     "numpy",
+    "optax>=0.2.8",
     "pytetwild>=0.4.2",
     "pyvista>=0.49.1",
     "rtree>=1.4.1",

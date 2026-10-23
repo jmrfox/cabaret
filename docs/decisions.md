@@ -2,6 +2,35 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-23: Fit in our own JAX solver, export to jaxley (plan 006)
+**Context:** The reduced model must run in jaxley, and it has to be fitted
+to FEM targets in the frequency domain (port impedance at DC, 100 Hz and
+1 kHz). jaxley simulates in time and has no impedance output, and there are
+no FEM time-domain targets beyond what we generate ourselves.
+**Decision:**
+- Fit with a small dense differentiable port-impedance solver in JAX
+  (`camovox.fit`). Add `optax` for Adam.
+- Export the fitted tree to jaxley (`camovox.jaxley_io`): one compartment
+  per node; edge resistance in `resistive_load_in`; branch-point load 1e-6;
+  membrane via `area`.
+- Verify the export against camovox transients (`simulate_current`).
+
+Rejected: fitting through jaxley's time-domain simulation (slower; needs
+transient targets, and frequency-domain targets are complete for linear
+networks).
+
+## 2026-10-23: PSD area is a literature-based guess; biology deferred
+**Context:** Real PSD areas won't be available (the DAB fill hid them). The
+user chose not to ask the experts for now, and to keep the focus on the core
+modelling goals.
+**Decision:**
+- Keep 0.05 µm² per synapse patch as a literature-based guess (mammalian
+  spine synapses average about 0.04 µm²; Schikorski & Stevens 1997).
+- Do uncertainty quantification later (`lognormal`, `area_sweep`).
+- Expert questions are pinned in `docs/questions-for-experts.md`.
+- Synapse biology (AMPA/NMDA, inhibition, ephys calibration) is deferred.
+- Recorded: neck points are approximate.
+
 ## 2026-10-23: Tree fitting with Biopython neighbor-joining + NNLS (plan 005)
 **Context:** Tree realization needs a tree topology from port distances,
 plus non-negative branch resistances.

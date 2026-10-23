@@ -22,7 +22,9 @@ from scipy.spatial import cKDTree
 from camovox.circuit import CompartmentGraph
 from camovox.tet import TetMesh
 
-PLACEHOLDER_PSD_AREA = 0.05  # µm², not data (design: "Area samplers")
+# µm². Literature-based guess: mammalian spine synapses average ~0.04 µm²
+# (Schikorski & Stevens 1997); no owl data. See design.md, "Area samplers".
+PLACEHOLDER_PSD_AREA = 0.05
 
 
 def ball_patch(

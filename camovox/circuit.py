@@ -409,3 +409,53 @@ def point_port(graph: CompartmentGraph, node: int) -> NDArray[np.float64]:
     w = np.zeros(graph.n_nodes)
     w[node] = 1.0
     return w
+
+
+def simulate_current(
+    graph: CompartmentGraph,
+    params: Passive,
+    injection: ArrayLike,
+    current: ArrayLike,
+    dt: float,
+    record: ArrayLike | None = None,
+) -> NDArray[np.float64]:
+    """Voltage response to a time-varying current injection (backward Euler).
+
+    Solves ``C dV/dt = -(L + G_m) V + w I(t)`` from rest, with one sparse
+    factorization reused at every step. This works for any network, from a
+    reduced model to the full FEM reference.
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+    params : Passive
+    injection : (N,) array_like of float
+        Injection weights (normalized to sum 1), e.g. a synapse patch.
+    current : (T,) array_like of float, in A
+        Injected current at each time step.
+    dt : float, in s
+        Time step.
+    record : (R, N) array_like of float, optional
+        Readout weights, one row per recorded site (each normalized to sum
+        1). Defaults to recording every node.
+
+    Returns
+    -------
+    (T, R) ndarray of float, in V
+        Voltage at each step (after applying that step's current).
+    """
+    w = _normalize(injection, graph.n_nodes)
+    c = graph.capacitance(params)
+    a = (graph.system_matrix(params) + sp.diags(c / dt)).tocsc()
+    lu = spla.splu(a)
+    if record is None:
+        readout = None
+    else:
+        r = np.atleast_2d(np.asarray(record, dtype=float))
+        readout = r / r.sum(axis=1, keepdims=True)
+    v = np.zeros(graph.n_nodes)
+    out = []
+    for i_t in np.asarray(current, dtype=float):
+        v = lu.solve(c / dt * v + w * i_t)
+        out.append(v if readout is None else readout @ v)
+    return np.array(out)

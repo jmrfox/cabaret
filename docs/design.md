@@ -673,8 +673,8 @@ function over them:
 
 | Sampler | Role |
 |---|---|
-| `fixed(area=0.05)` | **default placeholder**. 0.05 µm² is a mid-range order-of-magnitude value, not owl data |
-| `lognormal(median, sigma)` | opt-in, with user-supplied parameters. No literature defaults are shipped |
+| `fixed(area=0.05)` | **default, a literature-based guess.** No owl or avian PSD sizes exist, and Sanculi et al.'s DAB fill hid the PSDs. Mammalian spine synapses average about 0.04 µm² (AZ ≈ PSD; Schikorski & Stevens 1997), with skewed distributions (Bartol et al. 2015). 0.05 µm² sits in that range |
+| `lognormal(median, sigma)` | opt-in for uncertainty quantification. Suggested starting point: median 0.04 µm², log-spread to be set during UQ |
 | `morph_scaled(feature, ...)` | opt-in hypothesis scenario |
 | `empirical` *(when data arrives)* | resample measured PSD areas |
 
@@ -917,7 +917,11 @@ been confirmed.
    within 3 µm of a neck point. Its FEM nodes (interior included) are tied
    into one electrode, and their membrane is removed. The parent is all cell
    parts except the spine's own (parts at least 50% covered by the TS mesh).
-   See `camovox/graft.py` and plan 004. Neck points sit on the spine
+   See `camovox/graft.py` and plan 004. **Neck points are approximate**:
+   the user placed them by eye on the postsynaptic membrane near or on the
+   side of a neck. The contact rule is robust to that, because the port is
+   defined by where the meshes overlap, and the point only sets the 3 µm
+   search region. Neck points sit on the spine
    surface, and the TS traced base often reaches into the parent (TS1: 4.9
    µm² inside).
 
@@ -990,8 +994,12 @@ been confirmed.
 
 ### Simulation
 
-13. **Synapse models**: fixed-kinetics conductance (AMPA-like) only, or also
-    NMDA with Mg²⁺ block (nonlinear at patch nodes, Newton steps)?
+13. **Synapse models** *(deferred: biology factors come after the core
+    goals)*. Known so far: spine synapses are expected to be excitatory, and
+    the AMPA:NMDA ratio is unknown. Inhibition was previously modelled as
+    effective inputs to the sink/soma. ICx electrophysiology exists for later
+    calibration. Still open: fixed-kinetics (AMPA-like) only, or also NMDA
+    with Mg²⁺ block?
 14. **Placeholder synaptic parameters**: which kinetics and $g_\mathrm{max}$, and
     whether $g_\mathrm{max} \propto$ PSD area is the default.
 
@@ -1065,8 +1073,10 @@ been confirmed.
 - **Iterative refinement** with fit / probe / locked-test site roles and
   per-iteration temporary exports.
 - **Placeholder PSD area**: `fixed(0.05 µm²)`, `lognormal` opt-in, and
-  `area_sweep`. Sanculi et al. 2020 did not measure PSD sizes (DAB obscured
-  them), so real areas must come from the user's synapse tables.
+  `area_sweep`. PSD areas will not be available. Sanculi et al. 2020 could
+  not measure them (the DAB fill of the postsynaptic cell hid them), so the
+  default is a literature-based guess, with UQ later. The pinned expert
+  questions are in `docs/questions-for-experts.md`.
 - **Activation patterns**: a thin, data-first layer defined on sites and
   shared across backends.
 - **Package name**: keep `camovox` during development. It may be renamed
