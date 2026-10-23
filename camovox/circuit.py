@@ -290,11 +290,45 @@ def port_impedance(
     (F, P, P) ndarray of complex, in Ω
         Symmetric in the last two axes.
     """
-    w = np.column_stack([_normalize(p, graph.n_nodes) for p in patches])
     f = np.atleast_1d(np.asarray(freqs, dtype=float))
-    z = np.empty((len(f), w.shape[1], w.shape[1]), dtype=complex)
-    for k, fk in enumerate(f):
-        a = graph.system_matrix(params, omega=2 * np.pi * fk)
-        v = spla.splu(a).solve(w.astype(a.dtype))
-        z[k] = w.T @ v
-    return z
+    z = [PortSolver(graph, params, fk).impedance(patches) for fk in f]
+    return np.stack(z).astype(complex)
+
+
+class PortSolver:
+    """Factorize a network once, then compute port matrices for many patch sets.
+
+    Use this when the same network is probed with many site sets (null
+    models, jitter tests): each new set costs only back-substitutions.
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+    params : Passive
+    freq : float, in Hz
+        Frequency of the factorized admittance matrix (0 for DC).
+    """
+
+    def __init__(self, graph: CompartmentGraph, params: Passive, freq: float = 0.0):
+        self.graph = graph
+        a = graph.system_matrix(params, omega=2 * np.pi * freq)
+        self._dtype = a.dtype
+        self._lu = spla.splu(a)
+
+    def impedance(self, patches: Sequence[ArrayLike]) -> NDArray:
+        """Port matrix for a set of patches.
+
+        Parameters
+        ----------
+        patches : sequence of P (N,) array_like of float
+            Port weights, each normalized to sum 1.
+
+        Returns
+        -------
+        (P, P) ndarray, in Ω
+            Real at DC, complex otherwise.
+        """
+        w = np.column_stack([_normalize(p, self.graph.n_nodes) for p in patches])
+        v = self._lu.solve(w.astype(self._dtype))
+        z = w.T @ v
+        return z.real if self._dtype.kind == "f" else z

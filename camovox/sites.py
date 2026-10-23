@@ -339,3 +339,45 @@ def sample_uniform(
         chosen.append(v)
     pts = surface.position[chosen]
     return sites_from_points(surface, pts, "synapse", area=area, source="uniform")
+
+
+def jitter_sites(
+    surface: MembraneSurface,
+    sites: Sites,
+    radius: float,
+    rng: np.random.Generator,
+) -> Sites:
+    """Move each site to a random membrane point within a geodesic radius.
+
+    Each site moves to a vertex drawn area-weighted from the geodesic disk of
+    ``radius`` around its current position. Area, kind and axon labels are
+    kept. This tests how much results depend on exact synapse positions.
+
+    Parameters
+    ----------
+    surface : MembraneSurface
+    sites : Sites
+    radius : float, in µm
+        Geodesic jitter radius.
+    rng : numpy.random.Generator
+
+    Returns
+    -------
+    Sites
+    """
+    local, _ = surface.snap(sites.table[["x", "y", "z"]].to_numpy())
+    new_pts = np.empty((len(local), 3))
+    for i, v in enumerate(local):
+        dist = dijkstra(surface.graph, indices=int(v), limit=radius)
+        cand = np.flatnonzero(np.isfinite(dist))
+        p = surface.area[cand] / surface.area[cand].sum()
+        new_pts[i] = surface.position[rng.choice(cand, p=p)]
+    out = sites_from_points(
+        surface,
+        new_pts,
+        kind=str(sites.table["kind"].iloc[0]),
+        area=float(sites.table["area"].iloc[0]),
+        source=f"jitter{radius:g}",
+    )
+    out.table["axon_id"] = sites.table["axon_id"].to_numpy()
+    return out

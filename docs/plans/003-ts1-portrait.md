@@ -52,6 +52,34 @@ its neck. Compute the port impedance matrix and derive from it:
 - **The rank bound is high** (neck clamped, DC): 10% error needs rank ≥ 6,
   5% needs ≥ 12, and 1% needs ≥ 24 of 25.
 
+## Revision: stronger nulls and two violation measures (2026-10-23)
+
+- `circuit.PortSolver` and `ports.ResistanceMetric` factorize once, so each
+  null draw costs only back-substitutions (100 uniform draws in about 12 s).
+- `sites.jitter_sites` moves real AZs within a geodesic radius.
+- `ports.four_point_violation(d, normalize=...)`:
+  - `"max"`: relative, (a−b)/a, the accuracy a tree must accept;
+  - `"gap"`: intrinsic, (a−b)/(a−c), invariant to per-port leaf resistance;
+  - `"none"`: absolute gap a−b.
+
+  Patch spreading resistance dilutes the relative measure: the torus demo
+  gives 0.159 relative but 0.996 intrinsic for four evenly spaced ports.
+- **Revised TS1 interpretation:**
+  - The holes create real loop structure (intrinsic p90 0.21, max 0.91),
+    but it is electrically weak: absolute gaps are at most 4.5 MΩ against
+    median port distances of 28 MΩ. A tree should reproduce the distances to
+    about 1% typically and about 10% for the worst quadruple.
+  - Against 100 uniform draws, real AZs sit at the 8th–15th percentile
+    (relative) and the 20th–34th (intrinsic mean and p90). The earlier
+    "almost all random draws are higher" was 20-draw noise.
+  - Jitter percentiles are mostly 13–70%: not a fine-tuned optimum.
+  - **Lead:** the intrinsic *max* sits at the 4th percentile of uniform
+    draws and 0–13 under jitter. The real AZs avoid four ports evenly spread
+    around one hole. This is fragile (a maximum of an unstable ratio). It
+    needs a matched null (geodesic spacing, per-axon clustering) and the
+    other spines.
+- Notebooks 01 and 02 now explain each section and how to read it.
+
 ## Notes and follow-ups
 
 - **The rank bound is inflated by per-synapse self-terms.** Each patch has its

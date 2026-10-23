@@ -5,6 +5,7 @@ from importlib.metadata import version
 from camovox import ports, viz
 from camovox.circuit import (
     CompartmentGraph,
+    PortSolver,
     attach_sink,
     input_resistance,
     port_impedance,
@@ -19,6 +20,7 @@ from camovox.sites import (
     MembraneSurface,
     Sites,
     ball_patch,
+    jitter_sites,
     sample_uniform,
     sites_from_points,
 )
@@ -32,6 +34,7 @@ __all__ = [
     "FidelityReport",
     "MembraneSurface",
     "Passive",
+    "PortSolver",
     "Sites",
     "TetMesh",
     "attach_sink",
@@ -39,6 +42,7 @@ __all__ = [
     "current_density",
     "fem_model",
     "input_resistance",
+    "jitter_sites",
     "load_axon_groups",
     "load_mesh",
     "load_points",

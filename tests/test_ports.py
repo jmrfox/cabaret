@@ -51,3 +51,26 @@ def test_rank_bound_endpoints(rng):
     err = ports.rank_bound(a @ a.T)
     np.testing.assert_allclose([err[0], err[-1]], [1.0, 0.0])
     assert np.all(np.diff(err) <= 1e-12)
+
+
+def test_gap_normalized_violation_ignores_leaf_resistance(rng):
+    # A ring of 4 is maximally non-tree in the leaf-invariant measure.
+    ring = np.array(
+        [
+            [0, 0.75, 1.0, 0.75],
+            [0.75, 0, 0.75, 1.0],
+            [1.0, 0.75, 0, 0.75],
+            [0.75, 1.0, 0.75, 0],
+        ]
+    )
+    np.testing.assert_allclose(ports.four_point_violation(ring, "gap"), [1.0])
+    # Adding a leaf resistance to one port shifts all its distances.
+    leafy = ring.copy()
+    leafy[0, 1:] += 2.0
+    leafy[1:, 0] += 2.0
+    for norm in ("gap", "none"):
+        np.testing.assert_allclose(
+            ports.four_point_violation(leafy, norm),
+            ports.four_point_violation(ring, norm),
+        )
+    assert ports.four_point_violation(leafy, "max")[0] < 0.25

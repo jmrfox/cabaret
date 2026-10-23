@@ -13,8 +13,65 @@ from itertools import combinations
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from camovox.circuit import CompartmentGraph, attach_sink, port_impedance
+from camovox.circuit import CompartmentGraph, PortSolver, attach_sink
 from camovox.params import Passive
+
+
+class ResistanceMetric:
+    """Axial resistance distances between ports, with membrane removed.
+
+    The network keeps only its axial couplings and is grounded at the
+    ``ground`` patch (e.g. the neck) through a negligible resistance. It is
+    factorized once, so :meth:`distances` is cheap for many site sets.
+
+    Resistance distance $d_{ij} = R_{ii} + R_{jj} - 2 R_{ij}$, where R is the
+    grounded resistance matrix, is a metric on the ports. The ground patch
+    is included as port 0, with $d_{0i} = R_{ii}$.
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+    params : Passive
+        Only ``r_L`` is used.
+    ground : (N,) array_like of float
+        Weights of the grounded patch.
+    ground_resistance : float, in Ω
+        Grounding resistance. It must be tiny compared with port distances
+        (MΩ in spines), and it is subtracted from $d_{0i}$.
+    """
+
+    def __init__(
+        self,
+        graph: CompartmentGraph,
+        params: Passive,
+        ground: ArrayLike,
+        ground_resistance: float = 1.0,
+    ):
+        axial = replace(
+            graph, area=np.zeros_like(graph.area), g_ground=None, c_ground=None
+        )
+        self._solver = PortSolver(attach_sink(axial, ground, ground_resistance), params)
+        self._rg = ground_resistance
+
+    def distances(self, patches: Sequence[ArrayLike]) -> NDArray[np.float64]:
+        """Distance matrix for a set of port patches.
+
+        Parameters
+        ----------
+        patches : sequence of P (N,) array_like of float
+
+        Returns
+        -------
+        (P + 1, P + 1) ndarray of float, in Ω
+            Port 0 is the ground patch.
+        """
+        r = self._solver.impedance(list(patches))
+        r = 0.5 * (r + r.T)
+        diag = np.diag(r)
+        out = np.zeros((len(r) + 1, len(r) + 1))
+        out[1:, 1:] = diag[:, None] + diag[None, :] - 2 * r
+        out[0, 1:] = out[1:, 0] = diag - self._rg
+        return np.clip(out, 0.0, None)
 
 
 def resistance_distances(
@@ -24,56 +81,47 @@ def resistance_distances(
     ground: ArrayLike,
     ground_resistance: float = 1.0,
 ) -> NDArray[np.float64]:
-    """Axial resistance distances between ports, with membrane removed.
-
-    The network is grounded at the ``ground`` patch (e.g. the neck) through
-    a negligible resistance. The ground patch is returned as port 0.
-    Resistance distance $d_{ij} = R_{ii} + R_{jj} - 2 R_{ij}$ is a metric, and
-    $d_{0i} = R_{ii}$.
+    """One-off :class:`ResistanceMetric` distances (see there).
 
     Parameters
     ----------
     graph : CompartmentGraph
     params : Passive
-        Only ``r_L`` is used.
     patches : sequence of P (N,) array_like of float
-        Port weights.
     ground : (N,) array_like of float
-        Weights of the grounded patch.
     ground_resistance : float, in Ω
-        Grounding resistance. It must be tiny compared with port distances
-        (MΩ in spines).
 
     Returns
     -------
     (P + 1, P + 1) ndarray of float, in Ω
     """
-    axial = replace(graph, area=np.zeros_like(graph.area), g_ground=None, c_ground=None)
-    grounded = attach_sink(axial, ground, ground_resistance)
-    r = port_impedance(grounded, params, list(patches), 0.0)[0].real
-    r = 0.5 * (r + r.T)
-    diag = np.diag(r)
-    d = diag[:, None] + diag[None, :] - 2 * r
-    out = np.zeros((len(r) + 1, len(r) + 1))
-    out[1:, 1:] = d
-    out[0, 1:] = out[1:, 0] = diag - ground_resistance
-    return np.clip(out, 0.0, None)
+    metric = ResistanceMetric(graph, params, ground, ground_resistance)
+    return metric.distances(patches)
 
 
-def four_point_violation(d: ArrayLike) -> NDArray[np.float64]:
-    """Relative four-point violation of every port quadruple.
+def four_point_violation(d: ArrayLike, normalize: str = "max") -> NDArray[np.float64]:
+    """Four-point violation of every port quadruple.
 
     For ports i, j, k, l form the three pair sums ``d_ij + d_kl``,
     ``d_ik + d_jl`` and ``d_il + d_jk`` and sort them, ``a >= b >= c``. A
     metric is a tree metric (realizable by a tree with internal nodes) iff
-    ``a == b`` for every quadruple (Buneman 1974). The violation is
-    ``(a - b) / a``, which is 0 for trees and 0.25 for a ring of four equally
-    spaced ports.
+    ``a == b`` for every quadruple (Buneman 1974).
 
     Parameters
     ----------
     d : (P, P) array_like of float
         Symmetric distance matrix.
+    normalize : {"max", "gap", "none"}
+        - ``"max"``: ``(a - b) / a``. This is the relative error scale a tree
+          must accept on these distances. It is 0 for trees and 0.25 for
+          four points evenly spaced on an ideal ring. Port self-terms (patch
+          spreading resistance) add to every distance and dilute it.
+        - ``"gap"``: ``(a - b) / (a - c)``. This is invariant to adding a
+          leaf resistance to any port, so it measures intrinsic topology:
+          0 for trees, 1 for an ideal 4-port ring. It is unstable when all
+          three sums are nearly equal.
+        - ``"none"``: ``a - b``, in the units of ``d``. This is also
+          leaf-invariant.
 
     Returns
     -------
@@ -87,23 +135,54 @@ def four_point_violation(d: ArrayLike) -> NDArray[np.float64]:
     i, j, k, m = q.T
     sums = np.stack([d[i, j] + d[k, m], d[i, k] + d[j, m], d[i, m] + d[j, k]], axis=1)
     sums.sort(axis=1)
-    a, b = sums[:, 2], sums[:, 1]
-    return np.where(a > 0, (a - b) / np.where(a > 0, a, 1.0), 0.0)
+    a, b, c = sums[:, 2], sums[:, 1], sums[:, 0]
+    if normalize == "none":
+        return a - b
+    den = {"max": a, "gap": a - c}[normalize]
+    return np.where(den > 0, (a - b) / np.where(den > 0, den, 1.0), 0.0)
 
 
-def loopiness_index(d: ArrayLike) -> dict[str, float]:
+def worst_quadruples(
+    d: ArrayLike, k: int = 1, normalize: str = "max"
+) -> tuple[NDArray[np.int64], NDArray[np.float64]]:
+    """Find the port quadruples with the largest four-point violation.
+
+    Parameters
+    ----------
+    d : (P, P) array_like of float
+    k : int
+        Number of quadruples to return.
+    normalize : {"max", "gap", "none"}
+        See :func:`four_point_violation`.
+
+    Returns
+    -------
+    (k, 4) ndarray of int
+        Port indices (rows of ``d``).
+    (k,) ndarray of float
+        Their violations, largest first.
+    """
+    v = four_point_violation(d, normalize)
+    q = np.array(list(combinations(range(len(np.asarray(d))), 4)))
+    top = np.argsort(v)[::-1][:k]
+    return q[top], v[top]
+
+
+def loopiness_index(d: ArrayLike, normalize: str = "max") -> dict[str, float]:
     """Summary of the four-point violation over all quadruples.
 
     Parameters
     ----------
     d : (P, P) array_like of float
+    normalize : {"max", "gap", "none"}
+        See :func:`four_point_violation`.
 
     Returns
     -------
     dict
         ``median``, ``p90``, ``max`` and ``mean`` of the violation.
     """
-    v = four_point_violation(d)
+    v = four_point_violation(d, normalize)
     if len(v) == 0:
         return {"median": 0.0, "p90": 0.0, "max": 0.0, "mean": 0.0}
     return {
