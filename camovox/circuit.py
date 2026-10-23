@@ -332,3 +332,80 @@ class PortSolver:
         v = self._lu.solve(w.astype(self._dtype))
         z = w.T @ v
         return z.real if self._dtype.kind == "f" else z
+
+
+def add_electrode(
+    graph: CompartmentGraph,
+    nodes: ArrayLike,
+    kappa: float = 1e4,
+    remove_membrane: bool = True,
+) -> tuple[CompartmentGraph, int]:
+    """Tie a set of nodes into one equipotential port.
+
+    A new node is added and joined to every listed node by a very large
+    coupling, so the set behaves as a perfect conductor (an electrode).
+    Use this for a spine's attachment to its parent: the tied region stands
+    for parent cytoplasm, which is nearly isopotential at spine scale.
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+    nodes : (K,) array_like of int
+        Node indices to tie together.
+    kappa : float, in µm
+        Coupling of each node to the electrode. It must be much larger than
+        the network's own couplings (typically below 1 µm).
+    remove_membrane : bool
+        Set the tied nodes' membrane area to zero (and drop their ground
+        shunts). Their membrane is not real: it lies inside or against the
+        parent.
+
+    Returns
+    -------
+    CompartmentGraph
+        The network with one extra node (index ``graph.n_nodes``).
+    int
+        Index of the electrode node. Use a one-hot weight vector on it as a
+        port.
+    """
+    idx = np.unique(np.asarray(nodes, dtype=np.int64))
+    if idx.size == 0:
+        raise ValueError("electrode needs at least one node")
+    n = graph.n_nodes
+    area = np.append(graph.area, 0.0)
+    g0 = None if graph.g_ground is None else np.append(graph.g_ground, 0.0)
+    c0 = None if graph.c_ground is None else np.append(graph.c_ground, 0.0)
+    if remove_membrane:
+        area[idx] = 0.0
+        if g0 is not None:
+            g0[idx] = 0.0
+        if c0 is not None:
+            c0[idx] = 0.0
+    new_edges = np.column_stack([idx, np.full(idx.size, n)])
+    out = CompartmentGraph(
+        area=area,
+        position=np.vstack([graph.position, graph.position[idx].mean(axis=0)]),
+        edges=np.vstack([graph.edges, new_edges]),
+        kappa=np.concatenate([graph.kappa, np.full(idx.size, float(kappa))]),
+        g_ground=g0,
+        c_ground=c0,
+    )
+    return out, n
+
+
+def point_port(graph: CompartmentGraph, node: int) -> NDArray[np.float64]:
+    """Port weights for a single node (e.g. an electrode from :func:`add_electrode`).
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+    node : int
+
+    Returns
+    -------
+    (N,) ndarray of float
+        1 at ``node``, 0 elsewhere.
+    """
+    w = np.zeros(graph.n_nodes)
+    w[node] = 1.0
+    return w

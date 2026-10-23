@@ -892,18 +892,34 @@ been confirmed.
    can be added where error appears.
 3. **Soma**: BF's one compartment + access resistances as the default, or
    the port-based method like any other 3D region?
-4. **Isolated spines**: the boundary condition at the neck base for the 9
-   MASCAF spine meshes:
-   - (a) a parameterized sink (one-compartment soma with $R_\mathrm{in}$, $C$);
-   - (b) a semi-infinite cable;
-   - (c) grafting onto a whole-cell model.
+4. *Answered (2026-10-23):* **no sink for fitting.** A passive spine joined to
+   its parent only through its neck(s) is a linear multiport (synapses +
+   necks). A reduced spine that reproduces that multiport, with the necks
+   as ports, is exact when connected to *any* parent. So:
+   - spines are characterized and fitted **in isolation**, with each neck
+     as a port: the isolated-spine port matrix Z(f), with no parent
+     attached;
+   - the **neck port** is where the spine meets its parent, made
+     equipotential (an electrode), with its non-physical membrane removed.
+     On the TS meshes it is found from contact with the cell mesh (4b);
+   - the parent is attached at **grafting** time. The junction's spreading
+     resistance (about $r_L/(4a)$, BF) belongs to the parent side: a
+     whole-cell FEM has it automatically, and a reduced parent must add it;
+   - spines with **several necks** (TS3: 3, TS21: 2) are simply multiports
+     with several neck ports. The coupling between their attachment points
+     comes from the parent model;
+   - the sink used in toric_spines_sim (Arbor) answered "what does the
+     parent see". Here that question is answered by grafting onto a whole-
+     cell model (see "Two tracings" under Data).
 
-   The spine model is exported with a named port at each neck either way.
-   Spines with **several necks** (TS3: 3, TS21: 2, from the neck-point
-   files) need a boundary condition that couples the necks through the
-   parent, e.g. all necks attached to one shared sink, or to points along a
-   parent cable. Which one is right depends on where the necks land on the
-   real dendrite or soma. `cell.obj` can tell us.
+   4b. *Answered (option a):* the neck port is the part of the TS spine
+   that lies **inside the cell's parent part, or within 0.2 µm of it**,
+   within 3 µm of a neck point. Its FEM nodes (interior included) are tied
+   into one electrode, and their membrane is removed. The parent is all cell
+   parts except the spine's own (parts at least 50% covered by the TS mesh).
+   See `camovox/graft.py` and plan 004. Neck points sit on the spine
+   surface, and the TS traced base often reaches into the parent (TS1: 4.9
+   µm² inside).
 
 ### Refinement loop
 
@@ -981,15 +997,31 @@ been confirmed.
 
 ### Data, dependencies and interface
 
-15. **Data** *(partly answered; inventory in `data/README.md`)*:
-    `data/cell.obj` (whole cell, 330k faces, likely BF's
-    `cell_wrapped_simplified.obj`), the 9 TS meshes, and TS1's synapse-to-axon
-    grouping are present. Still to confirm:
-    - mesh units (5 nm pixels?) and provenance;
-    - whether `cell.obj` is the version where soma and spines form one
-      connected surface;
-    - when the synapse tables (positions, PSD areas, axon IDs) are expected,
-      and for which spines.
+15. **Data** *(mostly answered; inventory in `data/README.md`)*:
+    - units are 5 nm pixels (0.005 µm/px);
+    - `data/cell.obj` is byte-identical to `cell_wrapped_simplified_1cc.obj`
+      (soma and spines as one connected surface);
+    - AZ points exist for 7 spines and neck points for all 9;
+    - the cell is segmented by neuromesh-cgal into 91 watertight parts with
+      capped cuts;
+    - still open: real PSD areas, and synapse data for spines beyond the 7.
+
+    **Two tracings.** The 9 TS meshes were traced *separately* from the
+    whole cell, so each such spine exists twice: as a detailed TS mesh, and
+    as a coarser part of `cell.obj`. This has two consequences:
+    - *Grafting validation:* a whole-cell FEM contains the cell's own
+      version of each spine. To validate a reduced TS spine in situ, remove
+      the cell's version (via its neuromesh part), cut in a thin, cable-like
+      stretch of the neck, and join the TS multiport to the parent multiport
+      at the cut. This assumes the cut faces are equipotential.
+    - *Tracing variability:* comparing a spine's port properties between
+      its two tracings (same AZs snapped to both) measures how sensitive the
+      conclusions are to reconstruction.
+
+    Matching (AZ and neck-point proximity, plan 004): TS1 → part 17, TS4 →
+    36, TS2 → 43, TS3 → 21 (plus 1 AZ in part 13), TS48 → 57, TS67 → 30,
+    TS76 → 39. Neck points often fall in the neighbouring (parent) part, so
+    the segmentation cut lies on the spine side of the traced neck point.
 16. **Your MCF skeleton code**: optional baseline or diagnostic?
 17. **Interface**: library + notebooks only, or also a CLI for batch runs?
 
@@ -1013,9 +1045,12 @@ been confirmed.
 
 ### Generative model (new)
 
-22. **Spine segmentation of `cell.obj`**: integrate the user's SDF-based
-    partition code into camovox (as a dependency, or ported into
-    `surface.py`)? Where does it live?
+22. *Answered:* spine segmentation of `cell.obj` comes from the user's
+    [neuromesh-cgal](https://github.com/jmrfox/neuromesh-cgal): CGAL SDF,
+    graph-cut segmentation, SDF-aware merging and watertight partition. It
+    is C++, already built locally. camovox **reads its outputs** (`.seg`
+    and `.sdf` per-face sidecars, capped part OBJs) rather than
+    reimplementing it. Running it stays outside camovox for now.
 23. **Synapse data beyond TS1**: are synapse positions available for spines
     other than the 9 processed ones? If not, the generator's port statistics
     rest on TS1/TS7-type tables plus paper-level counts.

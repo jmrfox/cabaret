@@ -2,6 +2,47 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-23: Neck ports from contact with the cell mesh
+**Context:** The TS meshes have no cut face at their neck points: the
+points sit on the spine surface, and plane cross-sections were unstable.
+The user chose to define the attachment from the whole-cell mesh.
+**Decision:**
+- The neck port is the TS spine region inside a parent part of the
+  segmented cell, or within 0.2 µm of one (tracing-mismatch tolerance),
+  within 3 µm of a neck point.
+- Its FEM nodes are tied into one electrode (`add_electrode`, couplings of
+  1e4 µm), with their membrane removed.
+- Spine parts are those at least 50% covered by the TS mesh. Vertex-vote
+  rules misclassified parents.
+- Added `rtree` (trimesh closest-point and polygon queries).
+
+Rejected: plane cuts through neck points (unstable); a placeholder neck patch
+(it produced a spurious "intrinsic maximum" effect in plan 003); `shapely`
+and `mapbox-earcut` (only needed for capping plane cuts).
+
+## 2026-10-23: No sink; isolated-spine multiports; neuromesh outputs
+**Context:** The Arbor suite attached a large sink to each spine so the
+sink's voltage could be read under many inputs. camovox's goal is a reduced
+spine that behaves like the real one wherever it is attached. The TS
+meshes were traced separately from `cell.obj`. The user's neuromesh-cgal
+(C++/CGAL) already segments the cell into 91 capped, watertight parts.
+**Decision:**
+- Spines are fitted as **isolated multiports**: synapse ports plus neck
+  port(s) at the cut face, with the cap membrane removed. There is no sink
+  and no parent placeholder. Multiport composition makes this exact for any
+  parent.
+- The parent is attached at grafting time, with the junction spreading
+  resistance on the parent side.
+- In-situ validation swaps the cell's own version of a spine for the TS
+  multiport at a neck cut.
+- The two tracings of each spine give a tracing-variability measure.
+- camovox reads neuromesh-cgal outputs (sidecars and part meshes), copied
+  into `data/neuromesh/`, instead of reimplementing or wrapping the C++.
+
+Rejected: keeping a parameterized sink, whose placeholder values leak into
+results; fitting against the cell's coarser spine versions only;
+reimplementing SDF segmentation in Python.
+
 ## 2026-10-23: Terminology, placement sensitivity, generative spine model
 **Context:** The user asked for unambiguous terms instead of
 "teacher/student". Tree realization assumes known PSD locations, which the

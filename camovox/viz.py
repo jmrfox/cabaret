@@ -327,8 +327,12 @@ def plot_streamlines(
 
 def _patch_centers(tets: TetMesh, patches: Sequence[ArrayLike]) -> NDArray[np.float64]:
     out = np.empty((len(patches), 3))
+    n = len(tets.points)
     for k, w in enumerate(patches):
-        w = np.asarray(w, dtype=float)
+        # Weights may be longer than the mesh (extra nodes such as electrodes
+        # are appended after the mesh vertices); only mesh vertices have
+        # positions.
+        w = np.asarray(w, dtype=float)[:n]
         out[k] = (w[:, None] * tets.points).sum(axis=0) / w.sum()
     return out
 

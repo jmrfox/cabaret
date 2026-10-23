@@ -2,12 +2,14 @@
 
 from importlib.metadata import version
 
-from camovox import ports, viz
+from camovox import graft, ports, viz
 from camovox.circuit import (
     CompartmentGraph,
     PortSolver,
+    add_electrode,
     attach_sink,
     input_resistance,
+    point_port,
     port_impedance,
     solve_dc,
     time_constants,
@@ -37,15 +39,18 @@ __all__ = [
     "PortSolver",
     "Sites",
     "TetMesh",
+    "add_electrode",
     "attach_sink",
     "ball_patch",
     "current_density",
     "fem_model",
+    "graft",
     "input_resistance",
     "jitter_sites",
     "load_axon_groups",
     "load_mesh",
     "load_points",
+    "point_port",
     "port_impedance",
     "ports",
     "sample_uniform",

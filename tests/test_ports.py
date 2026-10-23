@@ -74,3 +74,22 @@ def test_gap_normalized_violation_ignores_leaf_resistance(rng):
             ports.four_point_violation(ring, norm),
         )
     assert ports.four_point_violation(leafy, "max")[0] < 0.25
+
+
+def test_electrode_makes_tied_nodes_equipotential():
+    # Chain 0-1-2-3-4 with membrane; tie nodes 3 and 4 into one electrode.
+    p = cv.Passive(r_L=100.0, g_pas=1e-3)
+    g = cv.CompartmentGraph(
+        area=np.full(5, 10.0),
+        position=np.zeros((5, 3)),
+        edges=np.array([[0, 1], [1, 2], [2, 3], [3, 4]]),
+        kappa=np.full(4, 0.1),
+    )
+    ge, e = cv.add_electrode(g, [3, 4])
+    assert ge.n_nodes == 6 and e == 5
+    np.testing.assert_allclose(ge.area[[3, 4]], 0.0)
+    w = np.zeros(6)
+    w[0] = 1.0
+    v = cv.solve_dc(ge, p, 1e-12 * w)
+    np.testing.assert_allclose(v[3], v[4], rtol=1e-6)
+    np.testing.assert_allclose(v[4], v[5], rtol=1e-6)

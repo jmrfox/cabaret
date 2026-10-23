@@ -11,14 +11,20 @@
 # of its interior; see notebook 01) and measures the electrical properties a
 # **reduced cable model** of TS1 would have to reproduce:
 #
-# 1. how **heterogeneous** its synapses are electrically (section 3);
-# 2. whether it splits into **electrically separate parts** (section 4);
+# 1. how **heterogeneous** its synapses are electrically (section 4);
+# 2. whether it splits into **electrically separate parts** (section 5);
 # 3. the **fewest compartments** any reduced model needs for a given
-#    accuracy (section 6);
+#    accuracy (section 7);
 # 4. whether its **holes matter**, or whether a loop-free tree of resistors
-#    could stand in for the spine (section 7);
+#    could stand in for the spine (section 8);
 # 5. whether the **real synapse positions** are special compared with random
-#    ones (sections 7–8).
+#    ones (sections 9–10).
+#
+# TS1 is analysed **on its own**, with its neck as a port, and with no model of
+# the soma or dendrite it attaches to. A passive spine joined to its parent
+# only through the neck is fully described this way: whatever parent it is
+# later connected to, its behaviour follows exactly. The neck port is where
+# the separately traced TS1 mesh meets the whole-cell mesh (section 2).
 #
 # Everything is passive (leak + capacitance), in the high-conductance
 # (in vivo) membrane state. Terms are defined in notebook 01's glossary.
@@ -30,7 +36,7 @@ import numpy as np
 import pyvista as pv
 
 import camovox as cv
-from camovox import ports, viz
+from camovox import graft, ports, viz
 
 pv.set_jupyter_backend("static")  # 3D views as static images in the notebook
 
@@ -45,20 +51,18 @@ pv.set_jupyter_backend("static")  # 3D views as static images in the notebook
 # | `SCALE` | 0.005 µm/px | All data files are in 5 nm SBEM pixel coordinates |
 # | `MEMBRANE` | r_L 100 Ω·cm, c_m 1 µF/cm², g_pas 2.63×10⁻⁴ S/cm² | High-conductance (in vivo) passive membrane, as in the earlier voxel study of this cell ("BF") |
 # | `PSD_AREA` | 0.05 µm² | **Placeholder** synapse patch area. PSD sizes were not measured in the EM data |
-# | `NECK_AREA` | 0.2 µm² | **Placeholder** size of the membrane patch where the neck joins its parent |
-# | `PARENT_R`, `PARENT_C` | 80 MΩ, 100 pF | **Placeholder** parent compartment (soma/dendrite) the neck attaches to. These are roughly the soma input resistance and capacitance in the BF study (open question 4 in the design) |
+# | `CONTACT_DISTANCE` | 0.2 µm | How close TS1's surface must come to the whole-cell mesh to count as attached. It allows for mismatch between the two tracings (AZ points sit 0.03–0.1 µm off TS1, neck points 0.1–0.45 µm off the cell) |
+# | `CONTACT_RADIUS` | 3 µm | Contacts are only searched for this close to the neck point, so places where the spine merely lies against other cell parts are ignored |
 # | `EDGE`, `ENVELOPE` | 0.2 µm, 0.005 µm | Tetrahedron size, and how far the meshed surface may move from the reconstruction. The envelope is kept far below the thinnest neck radius (about 0.06 µm) |
 # | `rng` | seed 0 | Random generator for the null models, so results are reproducible |
 #
-# Quantities computed with the neck **clamped** (held at rest) and all
-# loopiness results don't depend on `PARENT_R`/`PARENT_C`.
+# There is no parent placeholder: the spine is characterized on its own.
 
 # %%
 SCALE = 0.005  # µm per pixel
 MEMBRANE = cv.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)
 PSD_AREA = 0.05  # µm², placeholder
-NECK_AREA = 0.2  # µm², placeholder
-PARENT_R, PARENT_C = 80e6, 100e-12  # Ω, F, placeholder parent
+CONTACT_DISTANCE, CONTACT_RADIUS = 0.2, 3.0  # µm
 EDGE, ENVELOPE = 0.2, 0.005  # µm
 I_INJ = 10e-12  # test current for the voltage map: 10 pA
 rng = np.random.default_rng(0)
@@ -87,7 +91,6 @@ tets, fidelity = cv.tetrahedralize_cached(
     mesh, "../data/cache/TS1_e0.2_env0.005.npz", edge_length=EDGE, envelope=ENVELOPE
 )
 model, quality = cv.fem_model(tets)  # FEM network (one node per mesh vertex)
-membrane = cv.MembraneSurface.from_model(tets, model)  # for placing patches
 
 print(f"{fidelity.n_tets} tetrahedra, {model.n_nodes} mesh vertices")
 print(f"membrane area {fidelity.area_out:.1f} µm² ({100 * fidelity.area_error:+.2f}%)")
@@ -95,7 +98,45 @@ print(f"volume {fidelity.volume_out:.2f} µm³ ({100 * fidelity.volume_error:+.2
 print(f"negative couplings carry {100 * quality.negative_fraction:.1f}% of total |κ|")
 
 # %% [markdown]
-# ## 2. Sites: active zones and the neck
+# ## 2. The neck port: where TS1 meets the cell
+#
+# TS1 was traced **separately** from the whole cell (`cell.obj`), so the two
+# meshes don't share a cut face. The whole cell has been segmented into
+# parts (by the neuromesh-cgal pipeline: `../data/neuromesh/parts/`):
+# - the **cell's own version of TS1** = the parts mostly covered by the
+#   TS1 mesh;
+# - the **parent** = all other parts (soma, dendrites).
+#
+# Near the neck point, the TS1 tracing reaches **into** the parent: its base
+# overlaps the soma or dendrite. Everything of TS1 that lies inside the parent,
+# or within `CONTACT_DISTANCE` of it, is really parent cytoplasm. Those FEM
+# nodes are tied together into one **electrode**, the neck port, and their
+# membrane is removed. Electrically the parent is nearly isopotential at
+# spine scale, so an equipotential electrode is a good stand-in.
+
+# %%
+parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
+own_parts = graft.spine_parts(mesh, parts)  # the cell's own tracing of TS1
+neck_points = cv.load_points("../data/TS1_neckpoint.txt", SCALE)
+(contact,) = graft.neck_contacts(
+    tets,
+    parts,
+    own_parts,
+    neck_points,
+    distance=CONTACT_DISTANCE,
+    radius=CONTACT_RADIUS,
+)
+spine, neck_node = cv.add_electrode(model, contact)  # TS1 with its neck port
+neck_port = cv.point_port(spine, neck_node)  # port weights for the neck
+removed = model.area[contact].sum()
+print(f"cell parts that are TS1's own tracing: {own_parts.tolist()}")
+print(
+    f"neck port: {len(contact)} FEM nodes tied together; "
+    f"{removed:.2f} µm² of membrane removed ({100 * removed / model.area.sum():.0f}% of TS1)"
+)
+
+# %% [markdown]
+# ## 3. Sites: active zones
 #
 # - **Active zones** (`TS1_AZ.txt`): one point per synapse. AZs are
 #   *presynaptic*, so the points sit just outside the spine membrane, across
@@ -104,12 +145,13 @@ print(f"negative couplings carry {100 * quality.negative_fraction:.1f}% of total
 #   `PSD_AREA` along the surface.
 # - **Axons** (`TS1_syn_axon_dist.txt`): which of the 10 presynaptic axons
 #   made each synapse. Axons are numbered 0–9 in the order of that file.
-# - **Neck** (`TS1_neckpoint.txt`): where the spine joins its parent. It
-#   becomes a patch of `NECK_AREA`.
 #
-# The view shows each site as a sphere coloured by axon (neck = −1).
+# The view shows each AZ as a sphere coloured by axon, and the neck port
+# (its tied region) as −1. Patches are placed only on real membrane, so
+# never on the removed neck region.
 
 # %%
+membrane = cv.MembraneSurface.from_model(tets, spine)  # real membrane, for patches
 az = cv.sites_from_points(
     membrane,
     cv.load_points("../data/TS1_AZ.txt", SCALE),
@@ -117,21 +159,20 @@ az = cv.sites_from_points(
     area=PSD_AREA,
     axon_groups=cv.load_axon_groups("../data/TS1_syn_axon_dist.txt"),
 )
-neck = cv.sites_from_points(
-    membrane, cv.load_points("../data/TS1_neckpoint.txt", SCALE), "neck", area=NECK_AREA
-)
 axon = az.table.axon_id.to_numpy(dtype=float)  # axon of each AZ, 0–9
 print(
     f"{len(az)} AZs; snapped {az.table.snap_distance.min():.3f}–"
     f"{az.table.snap_distance.max():.3f} µm onto the membrane"
 )
+neck_region = np.zeros(spine.n_nodes)
+neck_region[contact] = 1.0  # for display: the tied region's centre
 pl = viz.plot_sites(
-    tets, az.patches + neck.patches, labels=[*axon, -1], name="axon (neck = -1)"
+    tets, [*az.patches, neck_region], labels=[*axon, -1], name="axon (neck = -1)"
 )
 pl.show()
 
 # %% [markdown]
-# ## 3. Port impedance matrix
+# ## 4. Port impedance matrix
 #
 # A **port** is a site through which current can enter or voltage can be
 # read: the 25 AZs plus the neck. The **impedance matrix** Z holds, in row i
@@ -144,14 +185,17 @@ pl.show()
 #   the parent.
 #
 # Z is computed at DC and at 100 Hz and 1 kHz (roughly the frequency content
-# of synaptic signals). The neck is attached to the placeholder parent
-# compartment.
+# of synaptic signals).
 #
-# **Neck clamped.** Every port also "feels" the parent through the neck,
-# which adds nearly the same large value to every entry. Mathematically
-# holding the neck at rest (a Schur complement of Z) removes that shared
-# part and leaves the spine's **own** internal structure: what a reduced
-# spine model must reproduce. It doesn't depend on the placeholder parent.
+# Two versions of Z:
+# - **Isolated spine** (neck port floating, nothing attached): the complete
+#   description of TS1 as a multiport, and the **target a reduced spine model
+#   is fitted to**. Its entries are large (GΩ), because an isolated spine can
+#   only lose current through its own small membrane.
+# - **Neck clamped** (neck held at rest, as if attached to a huge parent):
+#   what is left is the spine's **own internal structure**, how synapses
+#   interact inside the spine. It is mathematically derived from the
+#   isolated matrix (a Schur complement), so it carries no extra assumptions.
 #
 # **How to read the heat maps:** ports are in the order of the AZ file, with
 # the neck last on the left plot. Bright blocks are groups of synapses that
@@ -159,19 +203,16 @@ pl.show()
 # one compartment.
 
 # %%
-spine = cv.attach_sink(
-    model, neck.patches[0], resistance=PARENT_R, capacitance=PARENT_C
-)
 freqs = [0.0, 100.0, 1000.0]  # Hz
 z = cv.port_impedance(
-    spine, MEMBRANE, az.patches + neck.patches, freqs=freqs
+    spine, MEMBRANE, [*az.patches, neck_port], freqs=freqs
 )  # (3, 26, 26), Ω
 z_dc = z[0].real
 z_clamped = ports.clamp_port(z_dc, len(z_dc) - 1)  # neck held at rest -> (25, 25)
 
 fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 for ax, mat, title in [
-    (axs[0], z_dc, "Z at DC (MΩ); last row/col = neck"),
+    (axs[0], z_dc, "isolated spine, DC (MΩ); last = neck"),
     (axs[1], z_clamped, "Z with neck clamped (MΩ)"),
 ]:
     im = ax.imshow(mat / 1e6, cmap="viridis")
@@ -181,11 +222,9 @@ for ax, mat, title in [
     fig.colorbar(im, ax=ax)
 plt.show()
 
-r_in = np.diag(z_dc)[:-1] / 1e6  # input resistance at each AZ, MΩ
-r_local = np.diag(z_clamped) / 1e6  # the spine's own share of it, MΩ
+r_local = np.diag(z_clamped) / 1e6  # spine-local input resistance at each AZ, MΩ
 print(
-    f"input resistance at AZs: {r_in.min():.1f}–{r_in.max():.1f} MΩ "
-    "(includes the placeholder parent)"
+    f"isolated spine, seen from the neck: {z_dc[-1, -1] / 1e6:.0f} MΩ (spine membrane only)"
 )
 print(
     f"spine-local resistance (neck clamped): {r_local.min():.1f}–{r_local.max():.1f} MΩ "
@@ -198,10 +237,10 @@ print(
 # thin loop arms. A single-compartment spine model would give all of them
 # the same value. The 100 Hz and 1 kHz matrices are almost identical to DC,
 # because the spine is electrically small at these frequencies. They are
-# used in section 6.
+# used in section 7.
 
 # %% [markdown]
-# ## 4. Two electrical lobes
+# ## 5. Two electrical lobes
 #
 # The clamped heat map shows two bright blocks. To quantify this, define the
 # **coupling coefficient** between two synapses, $Z_{ij}/\sqrt{Z_{ii}Z_{jj}}$:
@@ -228,7 +267,7 @@ print(
     f"(max {coupling[across].max():.2f})"
 )
 pl = viz.plot_sites(
-    tets, az.patches + neck.patches, labels=[*lobe, -1], name="lobe (neck = -1)"
+    tets, [*az.patches, neck_region], labels=[*lobe, -1], name="lobe (neck = -1)"
 )
 pl.show()
 
@@ -240,11 +279,11 @@ pl.show()
 # can start from this structure: the neck plus one sub-tree per lobe.
 
 # %% [markdown]
-# ## 5. Voltage map for one synapse
+# ## 6. Voltage map for one synapse
 #
 # 10 pA into the AZ with the largest spine-local resistance (the most
-# electrically isolated synapse). Colour shows the voltage over the
-# membrane. Where the colour changes fastest is where the resistance is:
+# electrically isolated synapse), with the neck held at rest. Colour shows
+# the voltage over the membrane. Where the colour changes fastest is where the resistance is:
 # thin necks and arms. Regions of nearly uniform colour are close to
 # isopotential and could each be one compartment.
 
@@ -254,13 +293,18 @@ print(
     f"most isolated AZ: #{iso} (lobe {lobe[iso]}, axon {int(axon[iso])}), "
     f"{r_local[iso]:.1f} MΩ spine-local"
 )
+clamped = cv.attach_sink(
+    spine, neck_port, resistance=1.0
+)  # neck held at rest (1 Ω to ground)
 w = az.patches[iso]
-v = cv.solve_dc(spine, MEMBRANE, I_INJ * w / w.sum())  # V
+v = cv.solve_dc(clamped, MEMBRANE, I_INJ * w / w.sum())[
+    : len(tets.points)
+]  # V, mesh vertices
 pl = viz.plot_surface(tets, 1e3 * v, name="V (mV), 10 pA into the most isolated AZ")
 pl.show()
 
 # %% [markdown]
-# ## 6. Rank bound: the fewest compartments for a given error
+# ## 7. Rank bound: the fewest compartments for a given error
 #
 # Suppose a reduced model puts each synapse on one of m compartments. Its
 # impedance matrix between synapses then has **rank at most m**. The best
@@ -273,8 +317,9 @@ pl.show()
 # - where a curve crosses your tolerance (grey lines at 5% and 1%) gives a
 #   floor on the number of compartments that carry synapses;
 # - the **neck-clamped** curve is the one that describes the spine's
-#   internal structure. The full matrix is dominated by the shared parent,
-#   which makes it look deceptively simple;
+#   internal structure. The isolated matrix is dominated by one large shared
+#   term (the spine's total membrane, seen through the neck), which makes it
+#   look deceptively simple;
 # - the 100 Hz and 1 kHz curves lie on the DC curve, so faster synaptic
 #   signals don't need extra structure.
 #
@@ -287,7 +332,7 @@ pl.show()
 
 # %%
 fig, ax = plt.subplots(figsize=(5, 3.5))
-for label, mat in [("full Z (with parent)", z_dc), ("neck clamped, DC", z_clamped)]:
+for label, mat in [("isolated spine, DC", z_dc), ("neck clamped, DC", z_clamped)]:
     err = ports.rank_bound(mat)  # err[m] = lower bound for m compartments
     ax.semilogy(np.arange(len(err) - 1), err[:-1], "o-", ms=3, label=label)
 for f, z_f in zip(freqs[1:], z[1:], strict=True):
@@ -307,7 +352,7 @@ for tol in (0.1, 0.05, 0.01):
     print(f"error ≤ {tol:.0%} needs m ≥ {m} (neck clamped)")
 
 # %% [markdown]
-# ## 7. Loopiness: could a loop-free tree stand in for the spine?
+# ## 8. Loopiness: could a loop-free tree stand in for the spine?
 #
 # Simulators handle trees of compartments natively, and loops only with
 # workarounds. So it matters whether TS1's holes change its electrical
@@ -346,9 +391,7 @@ for tol in (0.1, 0.05, 0.01):
 # (`p90`) and maximum.
 
 # %%
-distances = ports.ResistanceMetric(
-    model, MEMBRANE, ground=neck.patches[0]
-)  # factorized once
+distances = ports.ResistanceMetric(spine, MEMBRANE, ground=neck_port)  # factorized once
 d_real = distances.distances(az.patches)  # (26, 26) Ω; row/col 0 = neck
 MEASURES = {"relative": "max", "intrinsic": "gap"}  # display name -> normalization
 loopiness_real = {m: ports.loopiness_index(d_real, n) for m, n in MEASURES.items()}
@@ -376,22 +419,22 @@ names = ["neck" if i == 0 else f"AZ {i - 1}" for i in quad]
 print("most loop-like quadruple:", ", ".join(names))
 pl = viz.plot_sites(
     tets,
-    [neck.patches[0] if i == 0 else az.patches[i - 1] for i in quad],
+    [neck_region if i == 0 else az.patches[i - 1] for i in quad],
     name="most loop-like quadruple",
 )
 pl.show()
 
 # %% [markdown]
-# ## 8. Is the real synapse placement special?
+# ## 9. Is the real synapse placement special?
 #
 # A low violation could be a property of TS1's shape (any synapses on it
 # would look tree-like) or of where the real AZs happen to sit. Two "null
 # models" separate these:
 #
 # - **Uniform re-draws** (100 draws): 25 sites placed at random over the
-#   membrane. Same patch area, at least 0.2 µm apart so patches don't
-#   overlap, and at least 1 µm from the neck so no random site merges into
-#   the neck port. Question: is the real placement unusually tree-like
+#   membrane. Same patch area, and at least 0.2 µm apart so patches don't
+#   overlap. The removed neck region has no membrane, so no random site lands
+#   there. Question: is the real placement unusually tree-like
 #   compared with random placement?
 # - **Jitter** (30 draws per radius): each real AZ moved to a random
 #   membrane point within a given distance along the surface (0.25, 0.5, 1
@@ -404,8 +447,7 @@ pl.show()
 # real placement is unusually tree-like.
 
 # %%
-min_spacing, neck_exclusion = 0.2, 1.0  # µm, see above
-neck_xyz = neck.table[["x", "y", "z"]].to_numpy()
+min_spacing = 0.2  # µm, see above
 
 
 def random_sites() -> cv.Sites:
@@ -416,8 +458,6 @@ def random_sites() -> cv.Sites:
         rng,
         area=PSD_AREA,
         min_spacing=min_spacing,
-        exclude=neck_xyz,
-        exclude_radius=neck_exclusion,
     )
 
 
@@ -482,27 +522,25 @@ plt.show()
 #   a tree with one branch per synapse should reproduce TS1's port distances
 #   to about 1% typically and about 10% for the worst quadruple.
 # - **The real AZs are on the low side, but not significantly.** For the
-#   relative measure they sit around the 8th–15th percentile of uniform
-#   draws. For the intrinsic mean and 90th percentile they are typical. At
-#   most this is weak evidence that real synapses avoid loop-sensitive
-#   positions.
-# - **Jitter mostly doesn't make things worse**, so the real placement is
-#   not a finely tuned optimum.
-# - **One lead worth following up: the intrinsic maximum.** Almost every
-#   random or jittered set contains one nearly perfect "ring" quadruple
-#   (intrinsic violation near 1). The real AZs don't (low single-digit
-#   percentiles). The real synapses may avoid sitting as four ports spread
-#   evenly around one hole. Treat this as a lead, not a result: a maximum is
-#   a fragile statistic, and the intrinsic ratio is unstable when its
-#   denominator is small.
+#   relative measure they sit around the 10th–25th percentile of uniform
+#   draws, and for the intrinsic measure around the 30th–40th. The real
+#   synapse positions are not detectably special with respect to loops.
+# - **Jitter doesn't make things worse**, so the real placement is not a
+#   finely tuned optimum.
+# - **A lead that didn't survive.** With a placeholder neck patch (an earlier
+#   version of this analysis), the real AZs seemed to avoid "ring-like"
+#   quadruples (intrinsic maximum at the 4th percentile). With the neck port
+#   defined from the cell mesh, that effect is gone: the intrinsic maximum is
+#   typical. It was an artifact of how the neck was modelled. This is a
+#   reminder that maxima of unstable ratios are fragile.
 # - **Caveats:** the uniform null ignores that real AZs cluster by axon and
-#   by lobe (section 4). Spacing is measured in a straight line, not along
+#   by lobe (section 5). Spacing is measured in a straight line, not along
 #   the surface. Patch area is a placeholder, and smaller PSDs would dilute
 #   the relative measure more. A stronger test would match the real AZs'
 #   clustering.
 
 # %% [markdown]
-# ## 9. Do real synapses sit at unusually isolated places?
+# ## 10. Do real synapses sit at unusually isolated places?
 #
 # The same comparison for a quantity that directly shapes synaptic
 # responses: the spine-local input resistance at each synapse (neck
@@ -511,11 +549,8 @@ plt.show()
 # histograms would separate.
 
 # %%
-solver = cv.PortSolver(spine, MEMBRANE)  # factorized once, reused for every draw
-r_local_uniform = []
-for _ in range(30):
-    z_u = solver.impedance(random_sites().patches + neck.patches)
-    r_local_uniform.append(np.diag(ports.clamp_port(z_u, len(z_u) - 1)))
+solver = cv.PortSolver(clamped, MEMBRANE)  # neck at rest; factorized once, reused
+r_local_uniform = [np.diag(solver.impedance(random_sites().patches)) for _ in range(30)]
 r_local_uniform = np.concatenate(r_local_uniform) / 1e6  # MΩ
 
 fig, ax = plt.subplots(figsize=(5, 3.2))
@@ -535,11 +570,13 @@ print(
 #
 # ## Summary: what a reduced TS1 model needs
 #
-# - **Heterogeneous synapses:** a 4× spread in spine-local resistance. One
+# - **Heterogeneous synapses:** a 4× spread in spine-local resistance
+#   (about 8–31 MΩ). One
 #   compartment for the whole spine is not enough when local voltages or
 #   cross-talk matter.
 # - **Two lobes:** the spine splits electrically into two lobes joined at the
-#   neck, each fed by its own set of axons. Start the reduced model from the
+#   neck (coupling across lobes about 0.01), each fed by its own set of
+#   axons. Start the reduced model from the
 #   neck plus one sub-tree per lobe.
 # - **Holes matter little electrically:** there is real loop structure, but
 #   a loop-free tree should reproduce the port distances to about 1%
