@@ -2,6 +2,51 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-23: Tree realization of loops by default
+**Context:** jaxley loops need a private-API workaround and give up the fast
+tree solver. But the goal is electrical equivalence, not geometry. Inside an
+electrically small spine, behaviour at the ports is set by port resistance
+distances. A tree with membrane-less internal nodes reproduces those exactly
+when they satisfy the four-point condition, and always for three ports.
+**Decision:** By default, represent loops by the best-fitting tree with
+internal nodes (neighbor-joining, then non-negative least squares) on FEM
+port resistance distances. A loopiness index (four-point violation) decides
+where literal loops are needed. Those fall back to the extra-edge workaround.
+The complexity analysis reports tree-only and looped fronts, and their gap
+measures the electrical value of loops. Rejected: always using literal loops
+(private API, slower solver); breaking cycles MASCAF-style without
+compensation (loses the coupling).
+
+## 2026-10-23: Add jaxley; close loops by extra compartment edges
+**Context:** The student must be a jaxley model, and toric spines need
+loops. Probing jaxley 0.14.0 showed three things. Gap-junction synapses
+can't carry axial-strength couplings (explicit, unstable). Extra
+compartment edges solved with `jax.sparse` are exact. Membrane area can be
+set independently of radius.
+**Decision:** Add `jaxley` (pinned `>=0.14,<0.15`, since the loop workaround
+touches the private `_comp_edges`). Loops are closed by appending
+compartment-to-compartment edges and using the `jax.sparse` voltage solver.
+This is wrapped in one camovox function so it can be swapped out if
+jaxley adds official support. Rejected: gap-junction synapses (unstable);
+our own JAX solver as the student (it would lose jaxley's channel library
+and community).
+
+## 2026-10-23: Teacher/student framing; jaxley is the target simulator
+**Context:** The long-term goal is population simulations (100+ neurons) of
+barn owl neurons with toric spines. FEM is too expensive at that scale. TS1
+alone has 25 synapses from 10 axons, so spine structure plausibly matters,
+but how much is unknown. The earlier Arbor suite (jmrfox/toric_spines_sim)
+was long and quirky. jaxley is used in the user's group and gives gradients.
+**Decision:** FEM is the teacher, and a jaxley cable model is the student.
+The field-based reduction provides topology and initialization. Gradient
+fitting through jaxley against FEM targets is a core step of every loop
+iteration (open question 6 answered). The output is a Pareto front of error
+against compartment count. A dedicated "effective complexity" analysis
+(rank of the FEM site-impedance matrix) measures how many compartments a
+spine needs for each target behaviour. jaxley expressiveness becomes a hard
+constraint. Rejected: parameters taken purely from solved fields with no
+optimization; one fixed-size model per cell.
+
 ## 2026-10-21: Dependencies for the FEM reference (plan 001)
 **Context:** Plan 001 needs mesh I/O, tetrahedralization, P1 assembly and
 sparse solves.

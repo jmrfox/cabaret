@@ -6,6 +6,7 @@ readme = "README.md"
 authors = [{ name = "Jordan M. R. Fox", email = "jfox@sdsu.edu" }]
 requires-python = ">=3.12"
 dependencies = [
+    "jaxley>=0.14,<0.15",
     "numpy",
     "pytetwild>=0.4.2",
     "pyvista>=0.49.1",
