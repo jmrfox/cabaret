@@ -271,17 +271,24 @@ def plot_streamlines(
 def plot_sites(
     tets: TetMesh,
     patches: Sequence[ArrayLike],
+    labels: Sequence[float] | None = None,
+    name: str = "site",
+    cmap: str = "tab20",
     plotter: "pv.Plotter | None" = None,
     off_screen: bool = False,
 ) -> "pv.Plotter":
-    """Show membrane patches on the surface, one colour per patch.
+    """Show membrane patches on the surface, coloured by a label per patch.
 
     Parameters
     ----------
     tets : TetMesh
     patches : sequence of (N,) array_like of float
-        Patch weights per vertex (nonzero inside the patch), e.g. from
-        :func:`camovox.sites.ball_patch`.
+        Patch weights per vertex (nonzero inside the patch).
+    labels : sequence of float, optional
+        One value per patch (e.g. axon ID). Defaults to the patch index.
+    name : str
+        Colour bar title.
+    cmap : str
     plotter : pyvista.Plotter, optional
     off_screen : bool
 
@@ -289,15 +296,20 @@ def plot_sites(
     -------
     pyvista.Plotter
     """
+    lab = np.arange(len(patches), dtype=float) if labels is None else labels
     label = np.full(len(tets.points), np.nan)
-    for k, w in enumerate(patches):
-        label[np.asarray(w) > 0] = k
-    surf = to_pyvista(tets, point_data={"site": label}).extract_surface(
+    for value, w in zip(lab, patches, strict=True):
+        label[np.asarray(w) > 0] = value
+    surf = to_pyvista(tets, point_data={name: label}).extract_surface(
         algorithm="dataset_surface"
     )
+    # Select by point index: vtkThreshold is very slow on large surfaces.
+    inside = np.flatnonzero(np.isfinite(surf.point_data[name]))
     pl = _plotter(plotter, off_screen)
     pl.add_mesh(surf, color="lightgray", opacity=0.4)
-    pl.add_mesh(surf.threshold(-0.5, scalars="site"), scalars="site", cmap="tab20")
+    pl.add_mesh(
+        surf.extract_points(inside, adjacent_cells=False), scalars=name, cmap=cmap
+    )
     return pl
 
 

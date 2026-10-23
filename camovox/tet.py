@@ -1,6 +1,7 @@
 """Tetrahedral meshing of a closed surface."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import trimesh
@@ -20,6 +21,30 @@ class TetMesh:
 
     points: NDArray[np.float64]
     tets: NDArray[np.int64]
+
+    def save(self, path: Path) -> None:
+        """Save to a compressed ``.npz`` file.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+        """
+        np.savez_compressed(Path(path), points=self.points, tets=self.tets)
+
+    @classmethod
+    def load(cls, path: Path) -> "TetMesh":
+        """Load a mesh written by :meth:`save`.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+
+        Returns
+        -------
+        TetMesh
+        """
+        with np.load(Path(path)) as f:
+            return cls(points=f["points"], tets=f["tets"].astype(np.int64))
 
     def boundary_faces(self) -> NDArray[np.int64]:
         """Triangles that belong to exactly one tetrahedron.
@@ -136,7 +161,11 @@ def tetrahedralize(
     )
     used, inverse = np.unique(tets, return_inverse=True)
     tm = TetMesh(points=points[used], tets=inverse.reshape(tets.shape).astype(np.int64))
-    report = FidelityReport(
+    return tm, _fidelity(mesh, tm)
+
+
+def _fidelity(mesh: trimesh.Trimesh, tm: TetMesh) -> FidelityReport:
+    return FidelityReport(
         area_in=float(mesh.area),
         area_out=tm.surface_area(),
         volume_in=float(abs(mesh.volume)),
@@ -144,4 +173,39 @@ def tetrahedralize(
         n_points=len(tm.points),
         n_tets=len(tm.tets),
     )
+
+
+def tetrahedralize_cached(
+    mesh: trimesh.Trimesh,
+    cache: Path,
+    edge_length: float,
+    envelope: float | None = None,
+    optimize: bool = True,
+) -> tuple[TetMesh, FidelityReport]:
+    """Like :func:`tetrahedralize`, but reuse a mesh saved at ``cache``.
+
+    The cache is not keyed on the parameters: delete the file after changing
+    ``edge_length`` or ``envelope``.
+
+    Parameters
+    ----------
+    mesh : trimesh.Trimesh
+        Closed surface, in µm.
+    cache : pathlib.Path
+        ``.npz`` file to read if it exists, otherwise to write.
+    edge_length, envelope, optimize
+        See :func:`tetrahedralize`.
+
+    Returns
+    -------
+    TetMesh
+    FidelityReport
+    """
+    cache = Path(cache)
+    if cache.exists():
+        tm = TetMesh.load(cache)
+        return tm, _fidelity(mesh, tm)
+    tm, report = tetrahedralize(mesh, edge_length, envelope, optimize)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    tm.save(cache)
     return tm, report

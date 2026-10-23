@@ -6,7 +6,8 @@ reference model and effective cable models are both compartment graphs, so
 they are solved by the same functions here.
 """
 
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 
 import numpy as np
 import scipy.sparse as sp
@@ -31,12 +32,20 @@ class CompartmentGraph:
     kappa : (E,) ndarray of float, in µm
         Geometric conductance factor of each edge, so that the axial
         conductance is ``kappa / r_L``.
+    g_ground : (N,) ndarray of float, in S, optional
+        Extra conductance from each node to ground (rest), independent of
+        the membrane parameters. Used for boundary conditions such as the
+        parent a spine neck attaches to.
+    c_ground : (N,) ndarray of float, in F, optional
+        Extra capacitance from each node to ground.
     """
 
     area: NDArray[np.float64]
     position: NDArray[np.float64]
     edges: NDArray[np.int64]
     kappa: NDArray[np.float64]
+    g_ground: NDArray[np.float64] | None = None
+    c_ground: NDArray[np.float64] | None = None
 
     @property
     def n_nodes(self) -> int:
@@ -75,10 +84,61 @@ class CompartmentGraph:
         -------
         (N, N) scipy.sparse.csc_matrix, in S
         """
-        a = self.laplacian(params) + sp.diags(params.membrane_conductance(self.area))
+        g = params.membrane_conductance(self.area)
+        if self.g_ground is not None:
+            g = g + self.g_ground
+        a = self.laplacian(params) + sp.diags(g)
         if omega != 0.0:
-            a = a + 1j * omega * sp.diags(params.capacitance(self.area))
+            a = a + 1j * omega * sp.diags(self.capacitance(params))
         return a.tocsc()
+
+    def capacitance(self, params: Passive) -> NDArray[np.float64]:
+        """Total capacitance to ground of each node (membrane + extra).
+
+        Parameters
+        ----------
+        params : Passive
+
+        Returns
+        -------
+        (N,) ndarray of float, in F
+        """
+        c = params.capacitance(self.area)
+        return c if self.c_ground is None else c + self.c_ground
+
+
+def attach_sink(
+    graph: CompartmentGraph,
+    weights: ArrayLike,
+    resistance: float,
+    capacitance: float = 0.0,
+) -> CompartmentGraph:
+    """Connect a patch to a lumped parent compartment held at rest.
+
+    The patch is joined to ground through ``resistance`` in parallel with
+    ``capacitance``, distributed over the patch nodes in proportion to
+    ``weights``. This models a spine neck joining a large parent (soma or
+    dendrite) whose own input impedance is given.
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+    weights : (N,) array_like of float
+        Patch weights (e.g. from a neck-point patch). Normalized to sum 1.
+    resistance : float, in Ω
+        Input resistance of the parent seen from the neck.
+    capacitance : float, in F
+        Capacitance of the parent (0 for a purely resistive sink).
+
+    Returns
+    -------
+    CompartmentGraph
+        A copy with ``g_ground`` and ``c_ground`` increased.
+    """
+    w = _normalize(weights, graph.n_nodes)
+    g0 = np.zeros(graph.n_nodes) if graph.g_ground is None else graph.g_ground
+    c0 = np.zeros(graph.n_nodes) if graph.c_ground is None else graph.c_ground
+    return replace(graph, g_ground=g0 + w / resistance, c_ground=c0 + w * capacitance)
 
 
 def _normalize(weights: ArrayLike, n: int) -> NDArray[np.float64]:
@@ -197,9 +257,44 @@ def time_constants(graph: CompartmentGraph, params: Passive, k: int = 3) -> NDAr
         Sorted from slowest to fastest.
     """
     a = graph.system_matrix(params)
-    c = params.capacitance(graph.area)
+    c = graph.capacitance(params)
     lu = spla.splu(a)
     op = spla.LinearOperator(a.shape, matvec=lambda x: lu.solve(c * x), dtype=float)
     vals = spla.eigs(op, k=k, which="LM", return_eigenvectors=False)
     tau = np.sort(np.abs(vals.real))[::-1]
     return tau
+
+
+def port_impedance(
+    graph: CompartmentGraph,
+    params: Passive,
+    patches: Sequence[ArrayLike],
+    freqs: ArrayLike = 0.0,
+) -> NDArray[np.complex128]:
+    """Impedance matrix between membrane patches (ports).
+
+    ``Z[k, i, j]`` is the patch-averaged voltage at port ``i`` per unit
+    current injected into port ``j`` at frequency ``freqs[k]``. Each
+    frequency costs one sparse factorization, and all ports share it.
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+    params : Passive
+    patches : sequence of P (N,) array_like of float
+        Port weights. Each is normalized to sum 1.
+    freqs : float or array_like of float, in Hz
+
+    Returns
+    -------
+    (F, P, P) ndarray of complex, in Ω
+        Symmetric in the last two axes.
+    """
+    w = np.column_stack([_normalize(p, graph.n_nodes) for p in patches])
+    f = np.atleast_1d(np.asarray(freqs, dtype=float))
+    z = np.empty((len(f), w.shape[1], w.shape[1]), dtype=complex)
+    for k, fk in enumerate(f):
+        a = graph.system_matrix(params, omega=2 * np.pi * fk)
+        v = spla.splu(a).solve(w.astype(a.dtype))
+        z[k] = w.T @ v
+    return z
