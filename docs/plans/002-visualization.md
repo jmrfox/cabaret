@@ -51,3 +51,18 @@ Export to ParaView. Demonstrate it all in a notebook on test shapes.
   explicitly, to silence a future-default warning.
 - fTetWild writes `__tracked_surface.stl` into the current directory (it is
   gitignored everywhere).
+
+**Figure fixes (2026-10-23)**, found by extracting the notebooks' saved
+PNGs:
+- Colour bars choose tick precision from the data range, so ticks are no
+  longer duplicated, and they are narrowed so end labels aren't clipped.
+- `plot_sites` draws a sphere at each patch centre with a categorical bar.
+  Real patches are smaller than the mesh triangles and were invisible.
+- `plot_streamlines` integrates the unit direction field and colours by
+  magnitude. Raw |J| of about 1e-12 had stalled the lines. Uses
+  `max_length`, since `max_time` was removed in PyVista 0.49.
+- `plot_isosurfaces` levels exclude the extremes. Notebook 01 plots
+  φ − min(φ), and writes "phi" because the VTK font has no φ glyph.
+- `plot_mesh_quality(fraction=0.2)` shows only the most negative couplings.
+- The `off_screen` default is now `None` (follow `pyvista.OFF_SCREEN`). An
+  explicit `False` had opened a blocking window in headless runs.

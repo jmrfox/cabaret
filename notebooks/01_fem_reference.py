@@ -107,7 +107,7 @@ pl.show()
 #
 # - **Surface voltage**: highest at the injection site, decaying symmetrically
 #   both ways around the ring to a minimum on the opposite side.
-# - **Streamlines** (tubes coloured by current density, log scale): current
+# - **Streamlines** (tubes coloured by current density |J|, log scale): current
 #   leaves the injection patch, splits, and flows both ways around the hole.
 #   This is what a loop does electrically: it offers two parallel paths.
 # - **Slice** (plane through the ring): the voltage is nearly uniform across
@@ -154,7 +154,8 @@ pl.show()
 # %%
 p_tiny = cv.Passive(r_L=100.0, c_m=1.0, g_pas=1e-8)
 phi = cv.solve_dc(t_ref, p_tiny, 10e-12 * wt / wt.sum())
-pl = viz.plot_isosurfaces(t_tets, 1e3 * phi, n=12, name="φ (mV)")
+# The tiny leak puts φ at a large offset; only differences matter here.
+pl = viz.plot_isosurfaces(t_tets, 1e3 * (phi - phi.min()), n=12, name="phi - min (mV)")
 pl.show()
 
 # %% [markdown]

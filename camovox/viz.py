@@ -72,10 +72,37 @@ def write_vtu(
     to_pyvista(tets, point_data, cell_data).save(Path(path))
 
 
-def _plotter(plotter: "pv.Plotter | None", off_screen: bool) -> "pv.Plotter":
+def _plotter(plotter: "pv.Plotter | None", off_screen: bool | None) -> "pv.Plotter":
     import pyvista as pv
 
     return plotter if plotter is not None else pv.Plotter(off_screen=off_screen)
+
+
+def _bar(values: ArrayLike, title: str, log_scale: bool = False) -> dict:
+    """Colour-bar arguments with tick precision matched to the data range."""
+    v = np.asarray(values, dtype=float)
+    v = v[np.isfinite(v)]
+    fmt = "%.3g"
+    if log_scale:
+        fmt = "%.1e"
+    elif v.size:
+        lo, hi = float(v.min()), float(v.max())
+        span, mag = hi - lo, max(abs(lo), abs(hi))
+        if mag >= 1e4 or 0 < mag < 1e-2:
+            fmt = "%.2e"
+        elif span > 0:
+            # Enough decimals that 5 evenly spaced ticks are distinct.
+            fmt = f"%.{max(0, int(np.ceil(-np.log10(span / 4))) + 1)}f"
+    # Narrower than the default so the end labels stay inside the image.
+    return {"title": title, "fmt": fmt, "n_labels": 5, "width": 0.6, "position_x": 0.2}
+
+
+def _surface(grid: "pv.UnstructuredGrid") -> "pv.PolyData":
+    return grid.extract_surface(algorithm="dataset_surface")
+
+
+def _ghost(pl: "pv.Plotter", tets: TetMesh, opacity: float = 0.15) -> None:
+    pl.add_mesh(_surface(to_pyvista(tets)), color="lightgray", opacity=opacity)
 
 
 def plot_surface(
@@ -88,7 +115,7 @@ def plot_surface(
     show_edges: bool = False,
     opacity: float = 1.0,
     plotter: "pv.Plotter | None" = None,
-    off_screen: bool = False,
+    off_screen: bool | None = None,
 ) -> "pv.Plotter":
     """Show the membrane surface, optionally coloured by a vertex field.
 
@@ -110,26 +137,28 @@ def plot_surface(
     opacity : float
     plotter : pyvista.Plotter, optional
         Add to an existing plotter instead of creating one.
-    off_screen : bool
+    off_screen : bool, optional
+        Render without a window. ``None`` follows ``pyvista.OFF_SCREEN``.
 
     Returns
     -------
     pyvista.Plotter
     """
-    data = {} if scalars is None else {name: scalars}
-    surf = to_pyvista(tets, point_data=data).extract_surface(
-        algorithm="dataset_surface"
-    )
     pl = _plotter(plotter, off_screen)
+    if scalars is None:
+        surf = _surface(to_pyvista(tets))
+        pl.add_mesh(surf, color="lightgray", show_edges=show_edges, opacity=opacity)
+        return pl
+    surf = _surface(to_pyvista(tets, point_data={name: scalars}))
     pl.add_mesh(
         surf,
-        scalars=name if scalars is not None else None,
+        scalars=name,
         cmap=cmap,
         log_scale=log_scale,
         clim=clim,
         show_edges=show_edges,
         opacity=opacity,
-        color=None if scalars is not None else "lightgray",
+        scalar_bar_args=_bar(surf.point_data[name], name, log_scale),
     )
     return pl
 
@@ -143,7 +172,7 @@ def plot_slice(
     cmap: str = "viridis",
     clim: Sequence[float] | None = None,
     plotter: "pv.Plotter | None" = None,
-    off_screen: bool = False,
+    off_screen: bool | None = None,
 ) -> "pv.Plotter":
     """Show a vertex field on a planar cut through the volume.
 
@@ -160,22 +189,24 @@ def plot_slice(
     cmap : str
     clim : (2,) sequence of float, optional
     plotter : pyvista.Plotter, optional
-    off_screen : bool
+    off_screen : bool, optional
+        Render without a window. ``None`` follows ``pyvista.OFF_SCREEN``.
 
     Returns
     -------
     pyvista.Plotter
     """
     grid = to_pyvista(tets, point_data={name: scalars})
+    cut = grid.slice(normal=normal, origin=origin)
     pl = _plotter(plotter, off_screen)
     pl.add_mesh(
-        grid.slice(normal=normal, origin=origin), scalars=name, cmap=cmap, clim=clim
+        cut,
+        scalars=name,
+        cmap=cmap,
+        clim=clim,
+        scalar_bar_args=_bar(cut.point_data[name], name),
     )
-    pl.add_mesh(
-        grid.extract_surface(algorithm="dataset_surface"),
-        color="lightgray",
-        opacity=0.15,
-    )
+    _ghost(pl, tets)
     return pl
 
 
@@ -186,36 +217,44 @@ def plot_isosurfaces(
     name: str = "value",
     cmap: str = "viridis",
     plotter: "pv.Plotter | None" = None,
-    off_screen: bool = False,
+    off_screen: bool | None = None,
 ) -> "pv.Plotter":
     """Show surfaces of constant value inside the volume.
 
     For a potential field these are equipotentials, which are the planned
-    compartment boundaries of the partition.
+    compartment boundaries of the partition. Levels are spaced evenly
+    between the field's minimum and maximum, excluding the extremes.
 
     Parameters
     ----------
     tets : TetMesh
     scalars : (N,) array_like of float
+        Subtract the minimum first if the field has a large offset.
     n : int
-        Number of evenly spaced levels.
+        Number of levels.
     name : str
+        Colour bar title with units.
     cmap : str
     plotter : pyvista.Plotter, optional
-    off_screen : bool
+    off_screen : bool, optional
+        Render without a window. ``None`` follows ``pyvista.OFF_SCREEN``.
 
     Returns
     -------
     pyvista.Plotter
     """
-    grid = to_pyvista(tets, point_data={name: scalars})
+    s = np.asarray(scalars, dtype=float)
+    grid = to_pyvista(tets, point_data={name: s})
+    levels = np.linspace(s.min(), s.max(), n + 2)[1:-1]
     pl = _plotter(plotter, off_screen)
-    pl.add_mesh(grid.contour(isosurfaces=n, scalars=name), scalars=name, cmap=cmap)
     pl.add_mesh(
-        grid.extract_surface(algorithm="dataset_surface"),
-        color="lightgray",
-        opacity=0.15,
+        grid.contour(isosurfaces=levels, scalars=name),
+        scalars=name,
+        cmap=cmap,
+        clim=(s.min(), s.max()),
+        scalar_bar_args=_bar(s, name),
     )
+    _ghost(pl, tets)
     return pl
 
 
@@ -225,11 +264,16 @@ def plot_streamlines(
     source_center: Sequence[float],
     source_radius: float,
     n_points: int = 200,
-    name: str = "J",
+    name: str = "current density (A/µm²)",
+    max_steps: int = 20000,
     plotter: "pv.Plotter | None" = None,
-    off_screen: bool = False,
+    off_screen: bool | None = None,
 ) -> "pv.Plotter":
     """Show current paths as streamlines of a per-tetrahedron vector field.
+
+    Lines follow the field's direction (integrated on the unit vector field,
+    so tiny magnitudes don't stall them) and are coloured by its magnitude on
+    a log scale.
 
     Parameters
     ----------
@@ -242,30 +286,51 @@ def plot_streamlines(
     n_points : int
         Number of seed points.
     name : str
+        Colour bar title for the magnitude, with units.
+    max_steps : int
+        Maximum integration steps per line.
     plotter : pyvista.Plotter, optional
-    off_screen : bool
+    off_screen : bool, optional
+        Render without a window. ``None`` follows ``pyvista.OFF_SCREEN``.
 
     Returns
     -------
     pyvista.Plotter
     """
-    grid = to_pyvista(tets, cell_data={name: vectors}).cell_data_to_point_data()
+    vec = np.asarray(vectors, dtype=float)
+    mag = np.linalg.norm(vec, axis=1)
+    unit = vec / np.where(mag > 0, mag, 1.0)[:, None]
+    grid = to_pyvista(tets, cell_data={"dir": unit, name: mag})
+    grid = grid.cell_data_to_point_data()
+    size = float(np.linalg.norm(np.ptp(tets.points, axis=0)))
     lines = grid.streamlines(
-        vectors=name,
+        vectors="dir",
         source_center=source_center,
         source_radius=source_radius,
         n_points=n_points,
         integration_direction="both",
+        max_steps=max_steps,
+        max_length=10.0 * size,
+        initial_step_length=0.2,
+        step_unit="cl",
     )
-    lines.point_data["|J|"] = np.linalg.norm(lines.point_data[name], axis=1)
     pl = _plotter(plotter, off_screen)
-    pl.add_mesh(lines.tube(radius=0.01 * source_radius), scalars="|J|", log_scale=True)
     pl.add_mesh(
-        grid.extract_surface(algorithm="dataset_surface"),
-        color="lightgray",
-        opacity=0.15,
+        lines.tube(radius=0.004 * size),
+        scalars=name,
+        log_scale=True,
+        scalar_bar_args=_bar(lines.point_data[name], name, log_scale=True),
     )
+    _ghost(pl, tets)
     return pl
+
+
+def _patch_centers(tets: TetMesh, patches: Sequence[ArrayLike]) -> NDArray[np.float64]:
+    out = np.empty((len(patches), 3))
+    for k, w in enumerate(patches):
+        w = np.asarray(w, dtype=float)
+        out[k] = (w[:, None] * tets.points).sum(axis=0) / w.sum()
+    return out
 
 
 def plot_sites(
@@ -274,10 +339,15 @@ def plot_sites(
     labels: Sequence[float] | None = None,
     name: str = "site",
     cmap: str = "tab20",
+    marker_radius: float | None = None,
     plotter: "pv.Plotter | None" = None,
-    off_screen: bool = False,
+    off_screen: bool | None = None,
 ) -> "pv.Plotter":
-    """Show membrane patches on the surface, coloured by a label per patch.
+    """Show sites as coloured spheres on a translucent membrane.
+
+    Each patch is drawn as a sphere at its area-weighted centre, because real
+    patches (about 0.05 µm²) are too small to see at whole-spine scale. Colours
+    are categorical, one per distinct label.
 
     Parameters
     ----------
@@ -289,46 +359,11 @@ def plot_sites(
     name : str
         Colour bar title.
     cmap : str
+    marker_radius : float, optional, in µm
+        Sphere radius. Defaults to 1.5% of the mesh diagonal.
     plotter : pyvista.Plotter, optional
-    off_screen : bool
-
-    Returns
-    -------
-    pyvista.Plotter
-    """
-    lab = np.arange(len(patches), dtype=float) if labels is None else labels
-    label = np.full(len(tets.points), np.nan)
-    for value, w in zip(lab, patches, strict=True):
-        label[np.asarray(w) > 0] = value
-    surf = to_pyvista(tets, point_data={name: label}).extract_surface(
-        algorithm="dataset_surface"
-    )
-    # Select by point index: vtkThreshold is very slow on large surfaces.
-    inside = np.flatnonzero(np.isfinite(surf.point_data[name]))
-    pl = _plotter(plotter, off_screen)
-    pl.add_mesh(surf, color="lightgray", opacity=0.4)
-    pl.add_mesh(
-        surf.extract_points(inside, adjacent_cells=False), scalars=name, cmap=cmap
-    )
-    return pl
-
-
-def plot_mesh_quality(
-    graph: CompartmentGraph,
-    tets: TetMesh,
-    plotter: "pv.Plotter | None" = None,
-    off_screen: bool = False,
-) -> "pv.Plotter":
-    """Show negative couplings (κ < 0) of a FEM network as coloured lines.
-
-    Parameters
-    ----------
-    graph : CompartmentGraph
-        FEM reference network.
-    tets : TetMesh
-        The mesh it was built from.
-    plotter : pyvista.Plotter, optional
-    off_screen : bool
+    off_screen : bool, optional
+        Render without a window. ``None`` follows ``pyvista.OFF_SCREEN``.
 
     Returns
     -------
@@ -336,19 +371,74 @@ def plot_mesh_quality(
     """
     import pyvista as pv
 
-    neg = graph.kappa < 0
+    lab = np.arange(len(patches)) if labels is None else np.asarray(labels)
+    size = float(np.linalg.norm(np.ptp(tets.points, axis=0)))
+    r = 0.015 * size if marker_radius is None else marker_radius
+    pts = pv.PolyData(_patch_centers(tets, patches))
+    pts.point_data[name] = lab
+    spheres = pts.glyph(geom=pv.Sphere(radius=r), scale=False, orient=False)
+    pl = _plotter(plotter, off_screen)
+    _ghost(pl, tets, opacity=0.3)
+    pl.add_mesh(
+        spheres,
+        scalars=name,
+        cmap=cmap,
+        categories=True,
+        scalar_bar_args={
+            "title": name,
+            "fmt": "%.0f",
+            "n_labels": len(set(lab)),
+            "width": 0.6,
+            "position_x": 0.2,
+        },
+    )
+    return pl
+
+
+def plot_mesh_quality(
+    graph: CompartmentGraph,
+    tets: TetMesh,
+    fraction: float = 0.2,
+    plotter: "pv.Plotter | None" = None,
+    off_screen: bool | None = None,
+) -> "pv.Plotter":
+    """Show the most negative couplings (κ < 0) of a FEM network as lines.
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+        FEM reference network.
+    tets : TetMesh
+        The mesh it was built from.
+    fraction : float
+        Share of negative couplings to draw, most negative first (1 = all).
+    plotter : pyvista.Plotter, optional
+    off_screen : bool, optional
+        Render without a window. ``None`` follows ``pyvista.OFF_SCREEN``.
+
+    Returns
+    -------
+    pyvista.Plotter
+    """
+    import pyvista as pv
+
+    neg = np.flatnonzero(graph.kappa < 0)
+    neg = neg[np.argsort(graph.kappa[neg])][: max(1, int(fraction * len(neg)))]
     e = graph.edges[neg]
     lines = pv.PolyData(
         graph.position, lines=np.hstack([np.full((len(e), 1), 2), e]).ravel()
     )
-    lines.cell_data["kappa (µm)"] = graph.kappa[neg]
+    title = "kappa (µm)"
+    lines.cell_data[title] = graph.kappa[neg]
     pl = _plotter(plotter, off_screen)
-    pl.add_mesh(lines, scalars="kappa (µm)", cmap="magma", line_width=2)
     pl.add_mesh(
-        to_pyvista(tets).extract_surface(algorithm="dataset_surface"),
-        color="lightgray",
-        opacity=0.15,
+        lines,
+        scalars=title,
+        cmap="magma",
+        line_width=2,
+        scalar_bar_args=_bar(graph.kappa[neg], title),
     )
+    _ghost(pl, tets)
     return pl
 
 
