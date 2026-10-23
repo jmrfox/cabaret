@@ -236,3 +236,54 @@ def rank_bound(z: ArrayLike) -> NDArray[np.float64]:
     s = np.linalg.svd(np.asarray(z), compute_uv=False)
     tail = np.sqrt(np.cumsum((s**2)[::-1])[::-1])  # tail[m] = ||s[m:]||
     return np.append(tail / tail[0], 0.0)
+
+
+def coupling_coefficients(z: ArrayLike) -> NDArray[np.float64]:
+    """Compute normalized port coupling, ``Z_ij / sqrt(Z_ii Z_jj)``.
+
+    For a passive network this lies in [0, 1]. It is 1 for two ports that
+    always see the same voltage (one compartment), and 0 for ports that don't
+    influence each other at all.
+
+    Parameters
+    ----------
+    z : (P, P) array_like of float
+        Real, symmetric port matrix (e.g. DC, neck clamped).
+
+    Returns
+    -------
+    (P, P) ndarray of float
+    """
+    z = np.asarray(z, dtype=float)
+    d = np.sqrt(np.diag(z))
+    return z / np.outer(d, d)
+
+
+def electrical_groups(z: ArrayLike, n_groups: int) -> NDArray[np.int64]:
+    """Split ports into groups that are strongly coupled within, weakly across.
+
+    Average-linkage hierarchical clustering on the distance
+    ``1 - coupling_coefficients(z)``.
+
+    Parameters
+    ----------
+    z : (P, P) array_like of float
+    n_groups : int
+
+    Returns
+    -------
+    (P,) ndarray of int
+        Group label per port, 0 … n_groups - 1, ordered by first port.
+    """
+    from scipy.cluster.hierarchy import fcluster, linkage
+    from scipy.spatial.distance import squareform
+
+    dist = 1.0 - coupling_coefficients(z)
+    np.fill_diagonal(dist, 0.0)
+    dist = 0.5 * (dist + dist.T)
+    lab = fcluster(
+        linkage(squareform(dist, checks=False), "average"), n_groups, "maxclust"
+    )
+    _, first = np.unique(lab, return_index=True)
+    order = {old: new for new, old in enumerate(lab[np.sort(first)])}
+    return np.array([order[x] for x in lab], dtype=np.int64)

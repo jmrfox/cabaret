@@ -1,25 +1,28 @@
 # %% [markdown]
-# # TS1 electrical portrait
+# # 02 · TS1 electrical portrait
 #
-# This notebook builds the **reference model** of toric spine TS1: a 3D
-# finite-element (FEM) model of its interior on a tetrahedral mesh. It
-# places the spine's **25 real active zones (AZs)** and its **neck** on the
-# membrane, then asks two questions that decide what a reduced cable model of
-# TS1 must look like:
+# **TS1** is a toric spine on a space-specific neuron in the barn owl
+# auditory midbrain (Sanculi et al. 2020, *eNeuro*). It is about 11.5 µm
+# long, has about 7 holes, and receives **25 synapses (active zones, AZs)
+# from 10 presynaptic axons**. Its shape is far from the tree-like
+# morphologies standard cable models assume.
 #
-# 1. **How many compartments are needed at least?** (the rank bound)
-# 2. **Do the holes matter electrically, or could a loop-free tree reproduce
-#    the spine?** (loopiness, via the four-point condition)
+# This notebook builds TS1's **reference model** (a 3D finite-element model
+# of its interior; see notebook 01) and measures the electrical properties a
+# **reduced cable model** of TS1 would have to reproduce:
 #
-# Everything is passive (leak + capacitance), with membrane in the
-# high-conductance (in vivo) state.
+# 1. how **heterogeneous** its synapses are electrically (section 3);
+# 2. whether it splits into **electrically separate parts** (section 4);
+# 3. the **fewest compartments** any reduced model needs for a given
+#    accuracy (section 6);
+# 4. whether its **holes matter**, or whether a loop-free tree of resistors
+#    could stand in for the spine (section 7);
+# 5. whether the **real synapse positions** are special compared with random
+#    ones (sections 7–8).
 #
-# **Placeholders** (results that depend on them are marked):
-# - every AZ is a membrane patch of 0.05 µm² (PSD areas are not in the data);
-# - the neck joins a parent compartment of 80 MΩ and 100 pF (open question 4).
-#
-# Results computed with the neck **clamped**, and all loopiness results, do
-# not depend on the parent values.
+# Everything is passive (leak + capacitance), in the high-conductance
+# (in vivo) membrane state. Terms are defined in notebook 01's glossary.
+# Runtime is about 1–2 minutes (meshing is cached after the first run).
 
 # %%
 import matplotlib.pyplot as plt
@@ -29,66 +32,99 @@ import pyvista as pv
 import camovox as cv
 from camovox import ports, viz
 
-pv.set_jupyter_backend("static")
-SCALE = 0.005  # µm per pixel (all data files are in pixel coordinates)
+pv.set_jupyter_backend("static")  # 3D views as static images in the notebook
+
+# %% [markdown]
+# ## Parameters and placeholders
+#
+# All choices in one place. **Placeholders** are values not yet backed by
+# data. Results that depend on them say so.
+#
+# | Name | Value | Meaning and source |
+# |---|---|---|
+# | `SCALE` | 0.005 µm/px | All data files are in 5 nm SBEM pixel coordinates |
+# | `MEMBRANE` | r_L 100 Ω·cm, c_m 1 µF/cm², g_pas 2.63×10⁻⁴ S/cm² | High-conductance (in vivo) passive membrane, as in the earlier voxel study of this cell ("BF") |
+# | `PSD_AREA` | 0.05 µm² | **Placeholder** synapse patch area. PSD sizes were not measured in the EM data |
+# | `NECK_AREA` | 0.2 µm² | **Placeholder** size of the membrane patch where the neck joins its parent |
+# | `PARENT_R`, `PARENT_C` | 80 MΩ, 100 pF | **Placeholder** parent compartment (soma/dendrite) the neck attaches to. These are roughly the soma input resistance and capacitance in the BF study (open question 4 in the design) |
+# | `EDGE`, `ENVELOPE` | 0.2 µm, 0.005 µm | Tetrahedron size, and how far the meshed surface may move from the reconstruction. The envelope is kept far below the thinnest neck radius (about 0.06 µm) |
+# | `rng` | seed 0 | Random generator for the null models, so results are reproducible |
+#
+# Quantities computed with the neck **clamped** (held at rest) and all
+# loopiness results don't depend on `PARENT_R`/`PARENT_C`.
+
+# %%
+SCALE = 0.005  # µm per pixel
+MEMBRANE = cv.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)
+PSD_AREA = 0.05  # µm², placeholder
+NECK_AREA = 0.2  # µm², placeholder
+PARENT_R, PARENT_C = 80e6, 100e-12  # Ω, F, placeholder parent
+EDGE, ENVELOPE = 0.2, 0.005  # µm
+I_INJ = 10e-12  # test current for the voltage map: 10 pA
 rng = np.random.default_rng(0)
 
 # %% [markdown]
 # ## 1. Mesh and FEM reference model
 #
-# The closed surface of TS1 is filled with tetrahedra. With linear (P1)
-# elements, the FEM is an electrical network on the mesh vertices: interior
-# couplings come from the stiffness matrix, and each surface vertex carries
-# a share of the membrane.
+# TS1's reconstructed surface (`TS1.obj`) is filled with tetrahedra. The FEM
+# model is an electrical network on the mesh vertices: interior couplings
+# come from the tetrahedra, and each surface vertex carries a share of the
+# membrane.
 #
-# What to check:
-# - **Area and volume change** measure how faithfully the tetrahedral mesh
-#   follows the original surface. Below 1% is good.
-# - **Negative couplings** come from badly shaped (obtuse) tetrahedra. The FEM
-#   answer is still accurate, but later reductions must tolerate them.
+# **What to check:**
+# - **area and volume change** say how faithfully the tetrahedral mesh
+#   follows the reconstruction; below 1% is good;
+# - **negative couplings** come from badly shaped tetrahedra. The FEM
+#   answer is still accurate (notebook 01), but later reduction steps need
+#   to tolerate them.
 #
-# Meshing takes about 2 minutes the first time and is cached in
-# `../data/cache/` (delete the file to re-mesh with other settings).
+# Meshing takes about 2 minutes the first time. The result is cached in
+# `../data/cache/`; delete that file to re-mesh with other settings.
 
 # %%
 mesh = cv.load_mesh("../data/TS1.obj", scale=SCALE)
-tets, rep = cv.tetrahedralize_cached(
-    mesh, "../data/cache/TS1_e0.2_env0.005.npz", edge_length=0.2, envelope=0.005
+tets, fidelity = cv.tetrahedralize_cached(
+    mesh, "../data/cache/TS1_e0.2_env0.005.npz", edge_length=EDGE, envelope=ENVELOPE
 )
-ref, q = cv.fem_model(tets)
-surf = cv.MembraneSurface.from_model(tets, ref)
-print(f"{rep.n_tets} tetrahedra, {ref.n_nodes} nodes")
-print(f"membrane area {rep.area_out:.1f} µm² ({100 * rep.area_error:+.2f}%)")
-print(f"volume {rep.volume_out:.2f} µm³ ({100 * rep.volume_error:+.2f}%)")
-print(f"negative couplings: {100 * q.negative_fraction:.1f}% of total |κ|")
+model, quality = cv.fem_model(tets)  # FEM network (one node per mesh vertex)
+membrane = cv.MembraneSurface.from_model(tets, model)  # for placing patches
+
+print(f"{fidelity.n_tets} tetrahedra, {model.n_nodes} mesh vertices")
+print(f"membrane area {fidelity.area_out:.1f} µm² ({100 * fidelity.area_error:+.2f}%)")
+print(f"volume {fidelity.volume_out:.2f} µm³ ({100 * fidelity.volume_error:+.2f}%)")
+print(f"negative couplings carry {100 * quality.negative_fraction:.1f}% of total |κ|")
 
 # %% [markdown]
-# ## 2. Sites: active zones and neck
+# ## 2. Sites: active zones and the neck
 #
-# AZ coordinates mark the presynaptic active zones, so they sit slightly
-# off the spine membrane (across the cleft). Each is **snapped** to the
-# nearest membrane vertex and grown into a geodesic patch of 0.05 µm². The
-# neck point becomes a larger patch (0.2 µm²) where the spine joins its
-# parent.
+# - **Active zones** (`TS1_AZ.txt`): one point per synapse. AZs are
+#   *presynaptic*, so the points sit just outside the spine membrane, across
+#   the synaptic cleft. Each is **snapped** to the nearest membrane vertex
+#   (the snap distance is printed) and grown into a membrane patch of
+#   `PSD_AREA` along the surface.
+# - **Axons** (`TS1_syn_axon_dist.txt`): which of the 10 presynaptic axons
+#   made each synapse. Axons are numbered 0–9 in the order of that file.
+# - **Neck** (`TS1_neckpoint.txt`): where the spine joins its parent. It
+#   becomes a patch of `NECK_AREA`.
 #
-# Colours give the presynaptic axon of each AZ (10 axons). The neck is −1.
+# The view shows each site as a sphere coloured by axon (neck = −1).
 
 # %%
 az = cv.sites_from_points(
-    surf,
+    membrane,
     cv.load_points("../data/TS1_AZ.txt", SCALE),
     "synapse",
+    area=PSD_AREA,
     axon_groups=cv.load_axon_groups("../data/TS1_syn_axon_dist.txt"),
 )
 neck = cv.sites_from_points(
-    surf, cv.load_points("../data/TS1_neckpoint.txt", SCALE), "neck", area=0.2
+    membrane, cv.load_points("../data/TS1_neckpoint.txt", SCALE), "neck", area=NECK_AREA
 )
-neck_xyz = neck.table[["x", "y", "z"]].to_numpy()
+axon = az.table.axon_id.to_numpy(dtype=float)  # axon of each AZ, 0–9
 print(
-    f"AZ snap distance {az.table.snap_distance.min():.3f}–"
-    f"{az.table.snap_distance.max():.3f} µm"
+    f"{len(az)} AZs; snapped {az.table.snap_distance.min():.3f}–"
+    f"{az.table.snap_distance.max():.3f} µm onto the membrane"
 )
-axon = az.table.axon_id.to_numpy(dtype=float)
 pl = viz.plot_sites(
     tets, az.patches + neck.patches, labels=[*axon, -1], name="axon (neck = -1)"
 )
@@ -97,322 +133,418 @@ pl.show()
 # %% [markdown]
 # ## 3. Port impedance matrix
 #
-# The **ports** are the 25 AZ patches plus the neck (last row and column).
-# $Z_{ij}$ is the voltage at port i per unit current injected at port j:
-# - the **diagonal** $Z_{ii}$ is the input resistance at synapse i, which
-#   sets how big a local EPSP is;
-# - the **off-diagonals** $Z_{ij}$ are transfer resistances, which set how
-#   much one synapse depolarizes another (cross-talk);
-# - $Z_{i,\mathrm{neck}}$ is what reaches the parent.
+# A **port** is a site through which current can enter or voltage can be
+# read: the 25 AZs plus the neck. The **impedance matrix** Z holds, in row i
+# and column j, the voltage at port i per unit current injected at port j:
+# - the **diagonal** $Z_{ii}$ is the *input resistance* at synapse i, which
+#   sets the size of its local EPSP;
+# - **off-diagonal** $Z_{ij}$ are *transfer resistances*: how much synapse j
+#   depolarizes synapse i (cross-talk);
+# - the **last column** is what each synapse delivers to the neck, and so to
+#   the parent.
 #
-# **Neck clamped.** Holding the neck at rest (a Schur complement of Z)
-# removes the part every port shares through the parent and leaves the
-# spine's **own** internal structure. This is the part a reduced spine
-# model must reproduce, and it does not depend on the placeholder parent.
+# Z is computed at DC and at 100 Hz and 1 kHz (roughly the frequency content
+# of synaptic signals). The neck is attached to the placeholder parent
+# compartment.
 #
-# How to read the heat maps: bright blocks are groups of AZs that are
-# electrically close to each other (strong mutual cross-talk). A uniform
-# matrix would mean the spine acts as a single compartment.
+# **Neck clamped.** Every port also "feels" the parent through the neck,
+# which adds nearly the same large value to every entry. Mathematically
+# holding the neck at rest (a Schur complement of Z) removes that shared
+# part and leaves the spine's **own** internal structure: what a reduced
+# spine model must reproduce. It doesn't depend on the placeholder parent.
+#
+# **How to read the heat maps:** ports are in the order of the AZ file, with
+# the neck last on the left plot. Bright blocks are groups of synapses that
+# strongly affect each other. A uniform matrix would mean the spine acts as
+# one compartment.
 
 # %%
-p = cv.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)
-spine = cv.attach_sink(ref, neck.patches[0], resistance=80e6, capacitance=100e-12)
-freqs = [0.0, 100.0, 1000.0]
-z = cv.port_impedance(spine, p, az.patches + neck.patches, freqs=freqs)
-zdc = z[0].real
-z_clamped = ports.clamp_port(zdc, len(zdc) - 1)
+spine = cv.attach_sink(
+    model, neck.patches[0], resistance=PARENT_R, capacitance=PARENT_C
+)
+freqs = [0.0, 100.0, 1000.0]  # Hz
+z = cv.port_impedance(
+    spine, MEMBRANE, az.patches + neck.patches, freqs=freqs
+)  # (3, 26, 26), Ω
+z_dc = z[0].real
+z_clamped = ports.clamp_port(z_dc, len(z_dc) - 1)  # neck held at rest -> (25, 25)
 
 fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-im = axs[0].imshow(zdc / 1e6, cmap="viridis")
-axs[0].set_title("Z, DC (MΩ); neck = last")
-fig.colorbar(im, ax=axs[0])
-im = axs[1].imshow(z_clamped / 1e6, cmap="viridis")
-axs[1].set_title("Z with neck clamped (MΩ)")
-fig.colorbar(im, ax=axs[1])
-for ax in axs:
-    ax.set_xlabel("port j")
-    ax.set_ylabel("port i")
+for ax, mat, title in [
+    (axs[0], z_dc, "Z at DC (MΩ); last row/col = neck"),
+    (axs[1], z_clamped, "Z with neck clamped (MΩ)"),
+]:
+    im = ax.imshow(mat / 1e6, cmap="viridis")
+    ax.set_title(title)
+    ax.set_xlabel("port j (injected)")
+    ax.set_ylabel("port i (recorded)")
+    fig.colorbar(im, ax=ax)
 plt.show()
-zii, zloc = np.diag(zdc)[:-1] / 1e6, np.diag(z_clamped) / 1e6
-print(f"input resistance at AZs: {zii.min():.1f}–{zii.max():.1f} MΩ (placeholder)")
-print(f"spine-local resistance (neck clamped): {zloc.min():.1f}–{zloc.max():.1f} MΩ")
+
+r_in = np.diag(z_dc)[:-1] / 1e6  # input resistance at each AZ, MΩ
+r_local = np.diag(z_clamped) / 1e6  # the spine's own share of it, MΩ
+print(
+    f"input resistance at AZs: {r_in.min():.1f}–{r_in.max():.1f} MΩ "
+    "(includes the placeholder parent)"
+)
+print(
+    f"spine-local resistance (neck clamped): {r_local.min():.1f}–{r_local.max():.1f} MΩ "
+    f"({r_local.max() / r_local.min():.1f}× spread)"
+)
 
 # %% [markdown]
-# The spine-local resistance varies about 4× across the 25 synapses. Some
-# AZs sit close to the neck electrically, others behind thin loop arms. This
-# heterogeneity is what a single-compartment spine model would erase.
+# **Reading:** the spine-local resistance varies about 4× across the 25
+# synapses. Some AZs are electrically close to the neck, others sit behind
+# thin loop arms. A single-compartment spine model would give all of them
+# the same value. The 100 Hz and 1 kHz matrices are almost identical to DC,
+# because the spine is electrically small at these frequencies. They are
+# used in section 6.
 
 # %% [markdown]
-# ## 4. Voltage field from the most isolated AZ
+# ## 4. Two electrical lobes
 #
-# 10 pA into the AZ with the largest spine-local resistance. Where the
-# colour changes fastest is where the resistance is: thin necks and arms.
-# Nearly uniform colour over a region means that region is close to
-# isopotential and could be one compartment.
+# The clamped heat map shows two bright blocks. To quantify this, define the
+# **coupling coefficient** between two synapses, $Z_{ij}/\sqrt{Z_{ii}Z_{jj}}$:
+# 1 if they always see the same voltage, 0 if they don't influence each
+# other. Clustering the synapses on this coefficient (into two groups)
+# finds the blocks without hand-picking them.
 
 # %%
-k = int(np.argmax(np.diag(z_clamped)))
-w = az.patches[k]
-v = cv.solve_dc(spine, p, 10e-12 * w / w.sum())
+coupling = ports.coupling_coefficients(z_clamped)
+lobe = ports.electrical_groups(z_clamped, n_groups=2)  # lobe label (0 or 1) per AZ
+off_diag = ~np.eye(len(lobe), dtype=bool)
+same_lobe = (lobe[:, None] == lobe[None, :]) & off_diag
+across = lobe[:, None] != lobe[None, :]
+for k in (0, 1):
+    members = np.flatnonzero(lobe == k)
+    axons_k = sorted({int(a) for a in axon[members]})
+    print(f"lobe {k}: AZs {members.tolist()} | axons {axons_k}")
+print(
+    f"coupling within a lobe: median {np.median(coupling[same_lobe]):.2f} "
+    f"(min {coupling[same_lobe].min():.2f})"
+)
+print(
+    f"coupling across lobes:  median {np.median(coupling[across]):.3f} "
+    f"(max {coupling[across].max():.2f})"
+)
+pl = viz.plot_sites(
+    tets, az.patches + neck.patches, labels=[*lobe, -1], name="lobe (neck = -1)"
+)
+pl.show()
+
+# %% [markdown]
+# **Reading:** TS1 behaves as **two lobes** joined at the neck. Synapses in
+# the same lobe are strongly coupled; synapses in different lobes barely
+# interact once the neck is held fixed. Each lobe gets inputs from a
+# different set of axons, and no axon has synapses in both. A reduced model
+# can start from this structure: the neck plus one sub-tree per lobe.
+
+# %% [markdown]
+# ## 5. Voltage map for one synapse
+#
+# 10 pA into the AZ with the largest spine-local resistance (the most
+# electrically isolated synapse). Colour shows the voltage over the
+# membrane. Where the colour changes fastest is where the resistance is:
+# thin necks and arms. Regions of nearly uniform colour are close to
+# isopotential and could each be one compartment.
+
+# %%
+iso = int(np.argmax(r_local))  # index of the most isolated AZ
+print(
+    f"most isolated AZ: #{iso} (lobe {lobe[iso]}, axon {int(axon[iso])}), "
+    f"{r_local[iso]:.1f} MΩ spine-local"
+)
+w = az.patches[iso]
+v = cv.solve_dc(spine, MEMBRANE, I_INJ * w / w.sum())  # V
 pl = viz.plot_surface(tets, 1e3 * v, name="V (mV), 10 pA into the most isolated AZ")
 pl.show()
 
 # %% [markdown]
-# ## 5. Rank bound: the fewest compartments for a given error
+# ## 6. Rank bound: the fewest compartments for a given error
 #
-# If every port of a reduced model sits on one of m compartments, its port
-# matrix has rank at most m. The best rank-m approximation of the FEM matrix
-# (from its singular values) therefore gives a **lower bound** on the error
-# of *any* such model, whatever its wiring. The curve shows that bound
-# (relative Frobenius error) against m.
+# Suppose a reduced model puts each synapse on one of m compartments. Its
+# impedance matrix between synapses then has **rank at most m**. The best
+# rank-m approximation of the FEM matrix (from its singular values) is
+# therefore a **lower bound** on the error of *any* such model, however it
+# is wired. The plot shows that bound (relative error, Frobenius norm)
+# against m.
 #
-# How to read it:
-# - the m where the curve crosses your tolerance is a floor on the number of
-#   compartments that carry synapses;
-# - the clamped curve is the honest one for the spine's internal structure,
-#   because the full matrix is dominated by the shared parent;
-# - curves at 100 Hz and 1 kHz show whether faster signals need more
-#   structure.
+# **How to read it:**
+# - where a curve crosses your tolerance (grey lines at 5% and 1%) gives a
+#   floor on the number of compartments that carry synapses;
+# - the **neck-clamped** curve is the one that describes the spine's
+#   internal structure. The full matrix is dominated by the shared parent,
+#   which makes it look deceptively simple;
+# - the 100 Hz and 1 kHz curves lie on the DC curve, so faster synaptic
+#   signals don't need extra structure.
 #
-# **Caveat: this bound is pessimistic.** Each patch has its own spreading
-# resistance (current must fan out from a 0.05 µm² disk, about 2 MΩ). That
-# adds a diagonal, full-rank term. A reduced model captures it cheaply with
-# one small series resistance per synapse, not with extra compartments. A
-# "diagonal + low rank" bound would separate the two (next step).
+# **Caveat: this bound is pessimistic.** Each synapse patch has its own
+# spreading resistance (current must fan out from a 0.05 µm² disk, about
+# 2 MΩ). That adds a separate term for every synapse, which only full rank
+# can capture. A reduced model represents it cheaply as one small resistor
+# per synapse, not as extra compartments. A "diagonal + low-rank" bound that
+# separates the two is the next analysis step.
 
 # %%
 fig, ax = plt.subplots(figsize=(5, 3.5))
-for name, zz in [("full Z (with parent)", zdc), ("neck clamped, DC", z_clamped)]:
-    err = ports.rank_bound(zz)
-    ax.semilogy(np.arange(len(err) - 1), err[:-1], "o-", ms=3, label=name)
-for f, zf in zip(freqs[1:], z[1:], strict=True):
-    err = ports.rank_bound(ports.clamp_port(zf, len(zf) - 1))
+for label, mat in [("full Z (with parent)", z_dc), ("neck clamped, DC", z_clamped)]:
+    err = ports.rank_bound(mat)  # err[m] = lower bound for m compartments
+    ax.semilogy(np.arange(len(err) - 1), err[:-1], "o-", ms=3, label=label)
+for f, z_f in zip(freqs[1:], z[1:], strict=True):
+    err = ports.rank_bound(ports.clamp_port(z_f, len(z_f) - 1))
     ax.semilogy(
-        np.arange(len(err) - 1), err[:-1], ".--", ms=3, label=f"clamped, {f:g} Hz"
+        np.arange(len(err) - 1), err[:-1], ".--", ms=3, label=f"neck clamped, {f:g} Hz"
     )
 for tol in (0.05, 0.01):
     ax.axhline(tol, color="gray", lw=0.8)
-ax.set_xlabel("rank m (compartments carrying synapses)")
+ax.set_xlabel("m (compartments carrying synapses)")
 ax.set_ylabel("lower bound on relative error")
 ax.legend(frameon=False, fontsize=8)
 plt.show()
-err_c = ports.rank_bound(z_clamped)
+err_clamped = ports.rank_bound(z_clamped)
 for tol in (0.1, 0.05, 0.01):
-    print(
-        f"error ≤ {tol:.0%} needs rank ≥ {int(np.argmax(err_c <= tol))} (neck clamped)"
-    )
+    m = int(np.argmax(err_clamped <= tol))
+    print(f"error ≤ {tol:.0%} needs m ≥ {m} (neck clamped)")
 
 # %% [markdown]
-# ## 6. Loopiness: could a loop-free tree reproduce these ports?
+# ## 7. Loopiness: could a loop-free tree stand in for the spine?
 #
-# **Resistance distance.** Remove the membrane, ground the neck, and define
-# $d_{ij} = R_{ii} + R_{jj} - 2R_{ij}$: the resistance you would measure
-# between ports i and j. It behaves like a distance (it obeys the triangle
-# inequality). The neck is port 0.
+# Simulators handle trees of compartments natively, and loops only with
+# workarounds. So it matters whether TS1's holes change its electrical
+# behaviour in a way no tree can mimic. The test (worked through on a ring
+# in notebook 01, section 5) uses:
 #
-# **Four-point condition.** Take any four ports and pair them up in the
-# three possible ways. Add the two distances in each pairing, giving three
-# sums. In a **tree** the two largest sums are always equal:
+# - **resistance distance** $d_{ij}$: the resistance between ports i and j
+#   with the membrane removed (neck = port 0);
+# - the **four-point condition**: for four ports, pair them up in the three
+#   possible ways, add the two distances in each pairing, and sort the sums
+#   a ≥ b ≥ c. The distances come from a tree with internal branch points
+#   **if and only if a = b for every quadruple** (Buneman 1974; the same
+#   test is used to fit phylogenetic trees).
 #
 # ```
-#   i         k        d_ij + d_kl  = small (i,j and k,l on the same side)
-#    \       /         d_ik + d_jl  = large  } equal in a tree: both cross
-#     o-----o          d_il + d_jk  = large  } the middle path once
+#   i         k        d_ij + d_kl  = smallest
+#    \       /         d_ik + d_jl  = largest  } equal in a tree: both
+#     o-----o          d_il + d_jk  = largest  } cross the middle once
 #    /       \
 #   j         l
 # ```
 #
 # A loop gives current two routes, which shortens some distances but not
-# others, so the two largest sums come apart. A metric is reproducible by a
-# tree with internal nodes **if and only if** the two largest sums are equal
-# for every quadruple (Buneman 1974, the same test used for phylogenetic
-# trees).
+# others, so a and b come apart. Two measures per quadruple:
 #
-# For one quadruple, sort the three sums a ≥ b ≥ c. Two measures (see
-# notebook 01, section 5, for a worked ring example):
+# - **relative violation** (a − b)/a: the error a tree must accept on these
+#   distances (0 = tree, 0.25 = four points evenly spaced on an ideal ring).
+#   This is the one that matters for **model accuracy**;
+# - **intrinsic violation** (a − b)/(a − c): ignores each synapse's own
+#   spreading resistance, which acts like a twig a tree can always add
+#   (0 = tree, 1 = ideal ring). It asks whether there is loop structure at
+#   all, however weak.
 #
-# - **Relative violation** (a − b)/a: the error scale a tree must accept on
-#   these distances. 0 for a tree, 0.25 for four *points* evenly spaced on
-#   an ideal ring. This is the one that matters for **model accuracy**.
-# - **Intrinsic violation** (a − b)/(a − c): unchanged by adding resistance in
-#   series with any port. 0 for a tree, 1 for an ideal 4-port ring. This
-#   measures **topology**: is there loop structure at all, however weak?
-#
-# Why both: current must fan out from each synapse patch (spreading
-# resistance, about 2 MΩ here). That adds the same amount to every distance
-# from that port, like a short leaf branch in a tree. Trees represent such
-# leaves for free, so it is right that they dilute the relative measure. But
-# they can hide loops that exist, and the intrinsic measure exposes those.
-#
-# The **loopiness index** summarizes each measure over all C(26, 4) = 14,950
-# quadruples (mean, 90th percentile, max).
+# The **loopiness index** summarizes each measure over all
+# C(26, 4) = 14,950 quadruples of the 26 ports: mean, 90th percentile
+# (`p90`) and maximum.
 
 # %%
-metric = ports.ResistanceMetric(ref, p, neck.patches[0])  # factorized once
-d_real = metric.distances(az.patches)
-measures = {"relative": "max", "intrinsic": "gap"}
-li_real = {m: ports.loopiness_index(d_real, n) for m, n in measures.items()}
-for m, li in li_real.items():
-    print(f"{m:>9}:", {k_: round(v_, 4) for k_, v_ in li.items()})
-gap_abs = ports.four_point_violation(d_real, "none")
-upper = d_real[np.triu_indices(len(d_real), 1)]
-g90, gmax, dmed = (
-    np.quantile(gap_abs, 0.9) / 1e6,
-    gap_abs.max() / 1e6,
-    np.median(upper) / 1e6,
-)
-print(f"absolute gap a − b: 90th pct {g90:.2f} MΩ, max {gmax:.2f} MΩ")
-print(f"median port distance {dmed:.1f} MΩ")
+distances = ports.ResistanceMetric(
+    model, MEMBRANE, ground=neck.patches[0]
+)  # factorized once
+d_real = distances.distances(az.patches)  # (26, 26) Ω; row/col 0 = neck
+MEASURES = {"relative": "max", "intrinsic": "gap"}  # display name -> normalization
+loopiness_real = {m: ports.loopiness_index(d_real, n) for m, n in MEASURES.items()}
+for m, li in loopiness_real.items():
+    print(f"{m:>9} violation:", {k: round(v_, 4) for k, v_ in li.items()})
 
-quads, vals = ports.worst_quadruples(d_real, k=1, normalize="none")
-print(f"largest gap: ports {quads[0].tolist()} (0 = neck), {vals[0] / 1e6:.2f} MΩ")
-worst = [neck.patches[0] if i == 0 else az.patches[i - 1] for i in quads[0]]
-pl = viz.plot_sites(tets, worst, name="most loop-like quadruple")
+gap = ports.four_point_violation(d_real, "none")  # a − b in Ω, per quadruple
+pair_d = d_real[np.triu_indices(len(d_real), 1)]  # all port-to-port distances
+print(
+    f"absolute gap a − b: 90th percentile {np.quantile(gap, 0.9) / 1e6:.2f} MΩ, "
+    f"max {gap.max() / 1e6:.2f} MΩ"
+)
+print(f"typical port-to-port distance: {np.median(pair_d) / 1e6:.1f} MΩ (median)")
+
+# %% [markdown]
+# Where would a tree be most wrong? The four ports with the largest absolute
+# gap, shown as spheres (the label is just the order within the quadruple).
+# Expect them to straddle a hole, where current has two comparable paths.
+# Check this in the view rather than assuming it.
+
+# %%
+quad, _ = ports.worst_quadruples(d_real, k=1, normalize="none")
+quad = quad[0]  # port indices; 0 = neck, i > 0 = AZ number i − 1
+names = ["neck" if i == 0 else f"AZ {i - 1}" for i in quad]
+print("most loop-like quadruple:", ", ".join(names))
+pl = viz.plot_sites(
+    tets,
+    [neck.patches[0] if i == 0 else az.patches[i - 1] for i in quad],
+    name="most loop-like quadruple",
+)
 pl.show()
 
 # %% [markdown]
-# The view above shows the four ports with the largest absolute gap, where a
-# tree would be most wrong. Expect them to straddle a hole, where current
-# has two comparable paths. Check this in the view rather than assuming it.
+# ## 8. Is the real synapse placement special?
 #
-# ### Is the real placement special? Two null models
+# A low violation could be a property of TS1's shape (any synapses on it
+# would look tree-like) or of where the real AZs happen to sit. Two "null
+# models" separate these:
 #
-# A low violation could be a property of TS1's shape (any synapses would
-# look tree-like) or of where the AZs sit. Two comparisons separate these:
+# - **Uniform re-draws** (100 draws): 25 sites placed at random over the
+#   membrane. Same patch area, at least 0.2 µm apart so patches don't
+#   overlap, and at least 1 µm from the neck so no random site merges into
+#   the neck port. Question: is the real placement unusually tree-like
+#   compared with random placement?
+# - **Jitter** (30 draws per radius): each real AZ moved to a random
+#   membrane point within a given distance along the surface (0.25, 0.5, 1
+#   or 2 µm). Question: do small changes to the real positions make loops
+#   matter more (real = a finely tuned optimum), or is the real value
+#   typical of its neighbourhood?
 #
-# - **Uniform re-draws**: 25 sites placed at random over the membrane (same
-#   patch area, at least 0.2 µm apart, at least 1 µm from the neck). Is the
-#   real placement unusually tree-like compared with random placement?
-# - **Jitter**: each real AZ moved randomly within a geodesic radius
-#   (0.25–2 µm). Does nudging the real AZs make things worse (real = a local
-#   optimum), or is the real value typical of its neighbourhood?
-#
-# Read the **percentile**: the share of null draws with a violation at or
-# below the real one. Around 50% means typical. Below 5% would mean
-# significantly more tree-like than chance.
+# **The percentile** is the share of null draws with a violation at or below
+# the real one. About 50% means typical, and below about 5% would mean the
+# real placement is unusually tree-like.
 
 # %%
-n_uniform = 100
-d_uniform = []
-for _ in range(n_uniform):
-    u = cv.sample_uniform(
-        surf, len(az), rng, min_spacing=0.2, exclude=neck_xyz, exclude_radius=1.0
+min_spacing, neck_exclusion = 0.2, 1.0  # µm, see above
+neck_xyz = neck.table[["x", "y", "z"]].to_numpy()
+
+
+def random_sites() -> cv.Sites:
+    """One uniform re-draw of 25 synapse sites."""
+    return cv.sample_uniform(
+        membrane,
+        len(az),
+        rng,
+        area=PSD_AREA,
+        min_spacing=min_spacing,
+        exclude=neck_xyz,
+        exclude_radius=neck_exclusion,
     )
-    d_uniform.append(metric.distances(u.patches))
-radii = [0.25, 0.5, 1.0, 2.0]
+
+
+d_uniform = [distances.distances(random_sites().patches) for _ in range(100)]
+jitter_radii = [0.25, 0.5, 1.0, 2.0]  # µm along the surface
 d_jitter = {
-    r: [metric.distances(cv.jitter_sites(surf, az, r, rng).patches) for _ in range(30)]
-    for r in radii
+    r: [
+        distances.distances(cv.jitter_sites(membrane, az, r, rng).patches)
+        for _ in range(30)
+    ]
+    for r in jitter_radii
 }
 
 
-def percentile(null: list[np.ndarray], measure: str, key: str) -> float:
-    """Share of null draws at or below the real value, in %."""
-    norm = measures[measure]
-    real = li_real[measure][key]
-    return 100 * np.mean([ports.loopiness_index(d, norm)[key] <= real for d in null])
+def percentile(null: list[np.ndarray], measure: str, stat: str) -> float:
+    """Share (%) of null draws whose violation is at or below the real one."""
+    norm = MEASURES[measure]
+    real = loopiness_real[measure][stat]
+    return 100 * np.mean([ports.loopiness_index(d, norm)[stat] <= real for d in null])
 
 
-for m, norm in measures.items():
-    for key in ("mean", "p90", "max"):
-        null = [ports.loopiness_index(d, norm)[key] for d in d_uniform]
+print(
+    "percentile of the real AZs among null draws (50 = typical, < 5 = unusually tree-like)"
+)
+for m in MEASURES:
+    for stat in ("mean", "p90", "max"):
         jit = ", ".join(
-            f"{r:g} µm: {percentile(d_jitter[r], m, key):.0f}" for r in radii
+            f"{r:g} µm: {percentile(d_jitter[r], m, stat):.0f}" for r in jitter_radii
         )
         print(
-            f"{m:>9} {key:>4}: real {li_real[m][key]:.4f} | uniform median "
-            f"{np.median(null):.4f}, real at {percentile(d_uniform, m, key):.0f}th pct"
-            f" | jitter pct {jit}"
+            f"{m:>9} {stat:>4}: real {loopiness_real[m][stat]:.4f}; "
+            f"uniform {percentile(d_uniform, m, stat):.0f}; jitter {jit}"
         )
 
 fig, axs = plt.subplots(2, 3, figsize=(12, 6))
-for row, (m, norm) in zip(axs, measures.items(), strict=True):
-    for ax, key in zip(row, ["mean", "p90", "max"], strict=True):
-        null = [ports.loopiness_index(d, norm)[key] for d in d_uniform]
-        ax.hist(null, bins=20, color="lightgray", label="uniform")
-        ax.axvline(li_real[m][key], color="C3", lw=2, label="real AZs")
-        ax.set_xlabel(f"{m} violation, {key}")
-    row[0].set_ylabel("count")
+for row, (m, norm) in zip(axs, MEASURES.items(), strict=True):
+    for ax, stat in zip(row, ["mean", "p90", "max"], strict=True):
+        ax.hist(
+            [ports.loopiness_index(d, norm)[stat] for d in d_uniform],
+            bins=20,
+            color="lightgray",
+            label="uniform re-draws",
+        )
+        ax.axvline(loopiness_real[m][stat], color="C3", lw=2, label="real AZs")
+        ax.set_xlabel(f"{m} violation, {stat}")
+    row[0].set_ylabel("number of draws")
 axs[0, 0].legend(frameon=False, fontsize=8)
 fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# ### How to interpret this
+# **How to read the histograms:** grey bars are the 100 random placements,
+# the red line is TS1's real AZs. Top row: relative measure; bottom row:
+# intrinsic measure.
 #
+# **Interpretation:**
 # - **The holes create real loop structure, but it is electrically weak.**
-#   The intrinsic measure reaches large values for some quadruples, so
-#   topologically there are loops between some synapses. But the absolute
-#   gaps (90th percentile below 1 MΩ, worst a few MΩ) are small next to the
-#   distances synapses see (median about 28 MΩ). The relative measure is
-#   therefore small: a tree with one leaf per synapse should reproduce TS1's
-#   port distances to about 1% typically and about 10% for the worst
-#   quadruple. That is good news for tree realization.
+#   The intrinsic measure is large for some quadruples, so topologically
+#   there are loops between some synapses. But the absolute gaps (90th
+#   percentile below 1 MΩ, worst a few MΩ) are small next to typical
+#   port-to-port distances (about 28 MΩ). So the relative measure is small:
+#   a tree with one branch per synapse should reproduce TS1's port distances
+#   to about 1% typically and about 10% for the worst quadruple.
 # - **The real AZs are on the low side, but not significantly.** For the
-#   relative measure they land around the 8th–15th percentile of uniform
-#   draws. For the intrinsic measure they are typical of uniform draws. An
-#   earlier 20-draw comparison suggested that almost all random draws were
-#   higher, but that was small-sample noise. This is weak evidence at most
-#   that the AZ positions avoid loop-sensitive locations.
-# - **Jitter mostly does not make things worse.** Moving the real AZs by up
-#   to 2 µm gives values typical of the real configuration for every summary
-#   but one, so the real placement is not a finely tuned optimum in general.
-# - **One exception worth following up: the intrinsic maximum.** Almost
-#   every random or jittered site set contains one nearly perfect "ring"
-#   quadruple (intrinsic violation about 1). The real AZs don't (0.91: 4th
-#   percentile of uniform draws, 0–13th under jitter). In plain terms, the real
-#   synapses seem to avoid sitting as four evenly spread ports around a
-#   single hole. Treat this as a lead, not a result: a maximum is a fragile
-#   statistic, and the intrinsic ratio is unstable when its denominator is
-#   small. It needs the matched null below and the other spines.
-# - **Caveats:** the uniform null ignores the real AZs' spatial clustering
-#   (by axon and by region). Spacing is Euclidean, not geodesic. Patch area
-#   is a placeholder, and it sets the leaf terms that dilute the relative
-#   measure: smaller PSDs give larger leaves and more dilution. A stronger
-#   test would use a null matched to the real AZs' geodesic spacing and
-#   per-axon clustering.
+#   relative measure they sit around the 8th–15th percentile of uniform
+#   draws. For the intrinsic mean and 90th percentile they are typical. At
+#   most this is weak evidence that real synapses avoid loop-sensitive
+#   positions.
+# - **Jitter mostly doesn't make things worse**, so the real placement is
+#   not a finely tuned optimum.
+# - **One lead worth following up: the intrinsic maximum.** Almost every
+#   random or jittered set contains one nearly perfect "ring" quadruple
+#   (intrinsic violation near 1). The real AZs don't (low single-digit
+#   percentiles). The real synapses may avoid sitting as four ports spread
+#   evenly around one hole. Treat this as a lead, not a result: a maximum is
+#   a fragile statistic, and the intrinsic ratio is unstable when its
+#   denominator is small.
+# - **Caveats:** the uniform null ignores that real AZs cluster by axon and
+#   by lobe (section 4). Spacing is measured in a straight line, not along
+#   the surface. Patch area is a placeholder, and smaller PSDs would dilute
+#   the relative measure more. A stronger test would match the real AZs'
+#   clustering.
 
 # %% [markdown]
-# ## 7. Placement sensitivity of spine-local resistance
+# ## 9. Do real synapses sit at unusually isolated places?
 #
-# Same comparison for a quantity that matters directly for synaptic
+# The same comparison for a quantity that directly shapes synaptic
 # responses: the spine-local input resistance at each synapse (neck
-# clamped). If real AZs sat at systematically more (or less) isolated
-# places than random sites, the two histograms would separate.
+# clamped), for the real AZs and for 30 uniform re-draws (750 random sites).
+# If real AZs sat at systematically more or less isolated places, the two
+# histograms would separate.
 
 # %%
-solver = cv.PortSolver(spine, p)  # factorized once
-local_uniform = []
+solver = cv.PortSolver(spine, MEMBRANE)  # factorized once, reused for every draw
+r_local_uniform = []
 for _ in range(30):
-    u = cv.sample_uniform(
-        surf, len(az), rng, min_spacing=0.2, exclude=neck_xyz, exclude_radius=1.0
-    )
-    zu = solver.impedance(u.patches + neck.patches)
-    local_uniform.append(np.diag(ports.clamp_port(zu, len(zu) - 1)))
-local_uniform = np.concatenate(local_uniform) / 1e6
+    z_u = solver.impedance(random_sites().patches + neck.patches)
+    r_local_uniform.append(np.diag(ports.clamp_port(z_u, len(z_u) - 1)))
+r_local_uniform = np.concatenate(r_local_uniform) / 1e6  # MΩ
+
 fig, ax = plt.subplots(figsize=(5, 3.2))
-ax.hist(local_uniform, bins=30, density=True, alpha=0.5, label="uniform")
-ax.hist(zloc, bins=15, density=True, alpha=0.5, label="real AZs")
+ax.hist(r_local_uniform, bins=30, density=True, alpha=0.5, label="random sites")
+ax.hist(r_local, bins=15, density=True, alpha=0.5, label="real AZs")
 ax.set_xlabel("spine-local input resistance, neck clamped (MΩ)")
 ax.set_ylabel("density")
 ax.legend(frameon=False)
 plt.show()
 print(
-    f"median local resistance: real {np.median(zloc):.1f} MΩ, "
-    f"uniform {np.median(local_uniform):.1f} MΩ"
+    f"median: real {np.median(r_local):.1f} MΩ, random {np.median(r_local_uniform):.1f} MΩ"
 )
 
 # %% [markdown]
-# ## Summary: what this says about a reduced TS1 model
+# **Reading:** the distributions overlap. Real synapses are neither
+# especially isolated nor especially close to the neck.
 #
-# - Synapses on TS1 are **electrically heterogeneous** (4× spread in local
-#   resistance), so one compartment is not enough when local voltages or
+# ## Summary: what a reduced TS1 model needs
+#
+# - **Heterogeneous synapses:** a 4× spread in spine-local resistance. One
+#   compartment for the whole spine is not enough when local voltages or
 #   cross-talk matter.
-# - The holes create genuine loop structure between some synapses, but it is
-#   **electrically weak**: a loop-free tree with one leaf per synapse plus
-#   internal branch points should reproduce the port distances to about 1%
-#   typically and about 10% at worst. The holes act mostly through the
-#   resistances they create, not through topology.
-# - The raw rank bound is high, but it is inflated by per-synapse spreading
-#   resistance. A diagonal + low-rank bound and an actual tree fit (next
-#   plan) will give the real compartment count.
+# - **Two lobes:** the spine splits electrically into two lobes joined at the
+#   neck, each fed by its own set of axons. Start the reduced model from the
+#   neck plus one sub-tree per lobe.
+# - **Holes matter little electrically:** there is real loop structure, but
+#   a loop-free tree should reproduce the port distances to about 1%
+#   typically and about 10% at worst. Loops act mostly through the
+#   resistances they create.
+# - **Compartment count:** the raw rank bound is high, but inflated by
+#   per-synapse spreading resistance. A diagonal + low-rank bound and an
+#   actual tree fit (next steps) will give the real number.

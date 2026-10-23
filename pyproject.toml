@@ -45,7 +45,7 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
-"notebooks/**" = ["D", "E402"]
+"notebooks/**" = ["D", "E402", "E501"]  # markdown tables/prose in comments can't wrap
 
 [tool.jupytext]
 formats = "ipynb,py:percent"

@@ -80,6 +80,28 @@ its neck. Compute the port impedance matrix and derive from it:
     other spines.
 - Notebooks 01 and 02 now explain each section and how to read it.
 
+## Revision: two lobes, and notebooks for collaborators (2026-10-23)
+
+- **TS1 has two electrical lobes.** `ports.coupling_coefficients`
+  (Z_ij/√(Z_ii Z_jj), neck clamped) and `ports.electrical_groups`
+  (average-linkage clustering) split the AZs into AZs 0–12 and 13–24.
+  - Coupling within a lobe: median 0.45 (min 0.21). Across lobes: median
+    0.05 (max 0.12).
+  - **No axon has synapses in both lobes**: axons {1, 3, 4, 6, 7} vs
+    {0, 2, 5, 8, 9}.
+  - A natural reduced-model starting point is the neck plus one sub-tree
+    per lobe.
+- The most loop-like quadruple is the neck plus AZs 6, 11 and 12, all in
+  lobe 0.
+- Notebooks 01 and 02 were revised for collaborators:
+  - a glossary;
+  - a single parameter table with sources and placeholders;
+  - descriptive variable names, and every number and choice explained;
+  - "what to look for" for each figure;
+  - summaries.
+- Notebooks are exempt from ruff E501, because markdown tables in comments
+  can't wrap. Code cells are still formatted by `ruff format`.
+
 ## Notes and follow-ups
 
 - **The rank bound is inflated by per-synapse self-terms.** Each patch has its
