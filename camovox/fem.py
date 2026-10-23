@@ -14,9 +14,10 @@ from dataclasses import dataclass
 
 import numpy as np
 import scipy.sparse as sp
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from camovox.circuit import CompartmentGraph
+from camovox.params import UM_TO_CM, Passive
 from camovox.tet import TetMesh
 
 
@@ -90,3 +91,43 @@ def fem_model(tets: TetMesh) -> tuple[CompartmentGraph, FemReport]:
         kappa=kappa,
     )
     return graph, report
+
+
+def tet_gradient(tets: TetMesh, values: ArrayLike) -> NDArray[np.float64]:
+    """Gradient of a P1 field, constant on each tetrahedron.
+
+    Parameters
+    ----------
+    tets : TetMesh
+    values : (N,) array_like of float
+        Field value at each mesh vertex.
+
+    Returns
+    -------
+    (M, 3) ndarray of float
+        Gradient per tetrahedron, in units of ``values`` per µm.
+    """
+    v = np.asarray(values, dtype=float)
+    p = tets.points[tets.tets]
+    edges = p[:, 1:] - p[:, :1]  # (M, 3, 3): rows are edge vectors
+    dv = v[tets.tets[:, 1:]] - v[tets.tets[:, :1]]  # (M, 3)
+    return np.linalg.solve(edges, dv[..., None])[..., 0]
+
+
+def current_density(
+    tets: TetMesh, voltage: ArrayLike, params: Passive
+) -> NDArray[np.float64]:
+    """Axial current density ``J = -grad(V) / r_L`` per tetrahedron.
+
+    Parameters
+    ----------
+    tets : TetMesh
+    voltage : (N,) array_like of float, in V
+    params : Passive
+
+    Returns
+    -------
+    (M, 3) ndarray of float, in A/µm²
+    """
+    sigma = 1.0 / (params.r_L / UM_TO_CM)  # S/µm
+    return -sigma * tet_gradient(tets, voltage)

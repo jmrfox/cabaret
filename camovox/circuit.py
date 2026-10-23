@@ -91,6 +91,34 @@ def _normalize(weights: ArrayLike, n: int) -> NDArray[np.float64]:
     return w / total
 
 
+def solve_dc(
+    graph: CompartmentGraph, params: Passive, injection: ArrayLike
+) -> NDArray[np.float64]:
+    """Steady-state voltage field for a current injection.
+
+    Parameters
+    ----------
+    graph : CompartmentGraph
+    params : Passive
+    injection : (N,) array_like of float, in A
+        Current injected at each node (positive = into the cell).
+
+    Returns
+    -------
+    (N,) ndarray of float, in V
+        Voltage relative to rest at every node.
+
+    Examples
+    --------
+    >>> w = ball_patch(ref, center, 0.5)  # doctest: +SKIP
+    >>> v = solve_dc(ref, Passive(), 1e-11 * w / w.sum())  # 10 pA  # doctest: +SKIP
+    """
+    i = np.asarray(injection, dtype=float)
+    if i.shape != (graph.n_nodes,):
+        raise ValueError(f"injection must have shape ({graph.n_nodes},)")
+    return spla.splu(graph.system_matrix(params)).solve(i)
+
+
 def transfer_impedance(
     graph: CompartmentGraph,
     params: Passive,

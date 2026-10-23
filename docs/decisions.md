@@ -2,6 +2,34 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-23: Terminology, placement sensitivity, generative spine model
+**Context:** The user asked for unambiguous terms instead of
+"teacher/student". Tree realization assumes known PSD locations, which the
+user expects to matter. High-resolution morphology is scarce (one whole cell
+with 76 spines, plus 9 processed spines), and the long-term network model
+needs synthetic cells.
+**Decision:**
+- Terminology: **reference model** (FEM) and **reduced model** (the jaxley
+  cable model fitted to it), used throughout `design.md`. Earlier log
+  entries are reworded to match.
+- Placement dependence is measured, not assumed away, in three ways:
+  impedance spread under jittered and re-drawn synapses; the transfer error
+  of a fixed reduced model on new sites; and convergence of a
+  placement-agnostic port basis.
+- Every fitted spine is saved as a **port model** (ports, tree, Z(f),
+  metadata), so that a later generative model can sample spines in tree
+  space, which is valid by construction. The generator itself is deferred.
+
+## 2026-10-23: Visualization stack (plan 002)
+**Context:** FEM solutions on odd shapes like TS1 need to be seen, not just
+summarized.
+**Decision:** Use PyVista for 3D. It is already installed through
+pytetwild, it is VTK-based, and it handles slices, isosurfaces, streamlines
+and off-screen rendering. Add `matplotlib` for profiles and traces. Fields
+export to `.vtu` for ParaView. Rejected: plotly (slow on large meshes, no
+volume filters); matplotlib 3D (slow, poor depth sorting); napari
+(voxel-oriented).
+
 ## 2026-10-23: Tree realization of loops by default
 **Context:** jaxley loops need a private-API workaround and give up the fast
 tree solver. But the goal is electrical equivalence, not geometry. Inside an
@@ -18,7 +46,7 @@ measures the electrical value of loops. Rejected: always using literal loops
 compensation (loses the coupling).
 
 ## 2026-10-23: Add jaxley; close loops by extra compartment edges
-**Context:** The student must be a jaxley model, and toric spines need
+**Context:** The reduced model must be a jaxley model, and toric spines need
 loops. Probing jaxley 0.14.0 showed three things. Gap-junction synapses
 can't carry axial-strength couplings (explicit, unstable). Extra
 compartment edges solved with `jax.sparse` are exact. Membrane area can be
@@ -28,16 +56,16 @@ touches the private `_comp_edges`). Loops are closed by appending
 compartment-to-compartment edges and using the `jax.sparse` voltage solver.
 This is wrapped in one camovox function so it can be swapped out if
 jaxley adds official support. Rejected: gap-junction synapses (unstable);
-our own JAX solver as the student (it would lose jaxley's channel library
+our own JAX solver as the reduced-model simulator (it would lose jaxley's channel library
 and community).
 
-## 2026-10-23: Teacher/student framing; jaxley is the target simulator
+## 2026-10-23: FEM reference model and jaxley reduced model; jaxley is the target simulator
 **Context:** The long-term goal is population simulations (100+ neurons) of
 barn owl neurons with toric spines. FEM is too expensive at that scale. TS1
 alone has 25 synapses from 10 axons, so spine structure plausibly matters,
 but how much is unknown. The earlier Arbor suite (jmrfox/toric_spines_sim)
 was long and quirky. jaxley is used in the user's group and gives gradients.
-**Decision:** FEM is the teacher, and a jaxley cable model is the student.
+**Decision:** The FEM model is the reference, and a jaxley cable model is the reduced model fitted to it.
 The field-based reduction provides topology and initialization. Gradient
 fitting through jaxley against FEM targets is a core step of every loop
 iteration (open question 6 answered). The output is a Pareto front of error

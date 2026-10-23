@@ -11,23 +11,28 @@ not match the cell's geometry. It must match the cell's **electrotonic
 behaviour**: input and transfer impedances, attenuation, time constants, and
 responses to synaptic input, as a multicompartmental simulator computes them.
 
-**Teacher and student.** A **3D finite-element (FEM) model** of the cell on a
-tetrahedral mesh is the expensive, high-resolution **teacher**. A
-[jaxley](https://github.com/jaxleyverse/jaxley) cable model is the cheap
-**student**: the model that will actually be simulated, eventually in
-**populations of 100+ neurons**, where FEM is not affordable. camovox makes the
-student behave like the teacher at the lowest compartment count:
+**Terminology.** Two models appear throughout:
+- the **reference model**: a 3D finite-element (FEM) model of the cell on a
+  tetrahedral mesh. It is expensive, high-resolution and treated as ground
+  truth;
+- the **reduced model**: a [jaxley](https://github.com/jaxleyverse/jaxley)
+  cable model fitted to the reference model. It is cheap, and it is the
+  model that will actually be simulated, eventually in **populations of
+  100+ neurons**, where FEM is not affordable.
 
-1. a physics-based reduction of the FEM gives the student's topology and
-   initial parameters;
-2. gradient-based optimization through jaxley (JAX) fits the student's
-   parameters to FEM targets;
-3. an iterative loop compares student and teacher and refines where the
-   student is wrong.
+camovox makes the reduced model reproduce the reference model's behaviour at
+the lowest compartment count:
 
-The student is a `MorphologyGraph`: a cable model (a 3D graph with vertex
-radii) that allows loops, so it can represent toric spines. It must be
-expressible in jaxley.
+1. a physics-based reduction of the reference model gives the reduced
+   model's topology and initial parameters;
+2. gradient-based optimization through jaxley (JAX) fits the reduced model's
+   parameters to reference-model targets;
+3. an iterative loop compares the two and refines where the reduced model
+   is wrong.
+
+The reduced model is a `MorphologyGraph`: a cable model (a 3D graph with
+vertex radii), with loops allowed where needed, that must be expressible in
+jaxley.
 
 Output: the jaxley model plus SWC (a valid tree, with the edges cut to break
 cycles recorded in the header, following the MASCAF convention) and an exact
@@ -49,7 +54,7 @@ application is the toric spines of barn owl space-specific neurons.
   tools failed on them.
 - **MASCAF** made cable fitting robust, but it remains hard, and its models
   were validated only geometrically. No high-resolution simulation was ever
-  used to check them. camovox adds that simulation (the FEM teacher).
+  used to check them. camovox adds that simulation (the FEM reference model).
 - Synaptic input is rich, which is the reason for this effort: **TS1 has 25
   synapses from 10 presynaptic axons** and about 7 holes. With a single
   synapse per spine, a detailed model would hardly be needed. The per-axon
@@ -78,7 +83,7 @@ application is the toric spines of barn owl space-specific neurons.
   1. it is used in the user's current research group;
   2. Arbor code for full-control simulation tends to be long and quirky, and
      we want to see whether jaxley is more concise;
-  3. JAX gives gradients, which suits fitting the student to the teacher.
+  3. JAX gives gradients, which suits fitting the reduced model to the reference model.
 - **Open scientific question:** for a given accuracy, how many compartments,
   and in what configuration, does a cable model of a toric spine need to
   reproduce the FEM? The answer depends on which behaviour must be
@@ -175,7 +180,7 @@ directly. Voxels are only an input format.
 2. **Tetrahedral FEM is the reference.** Every effective model is judged
    against a FEM solve of the same closed surface. FEM is itself checked
    against analytic solutions and by mesh refinement.
-3. **Initialize from solved fields, then optimize against the teacher.** The
+3. **Initialize from solved fields, then optimize against the reference model.** The
    reduction takes conductances from flux divided by potential drop, not from
    radius estimates. Gradient fitting through jaxley then tunes them to FEM
    targets. Membrane area per compartment stays physically meaningful,
@@ -196,7 +201,7 @@ directly. Voxels are only an input format.
    loop may use fit and probe sites freely. A **locked test set** is never
    seen by the loop and gives the final, honest score.
 10. **Cost is an objective.** Compartment count is traded explicitly against
-    error (a Pareto front), because the student will be simulated in
+    error (a Pareto front), because the reduced model will be simulated in
     populations.
 
 ## Scope
@@ -291,7 +296,7 @@ smallest cable model that reproduces the FEM to within ε? That means both
 its **compartment count** and its **configuration**: the topology (chain,
 tree, which loops are kept), where each synapse attaches, and how the spine
 joins its parent. This is a scientific result in its own right, and it sets
-the student's budget.
+the reduced model's compartment budget.
 
 The answer comes in two halves, which bracket the truth.
 
@@ -303,10 +308,10 @@ The answer comes in two halves, which bracket the truth.
 3. Solve FEM once per site (one back-substitution each). This gives the site
    impedance matrix $Z_{ij}(f)$ among all sites plus the neck base, at a few
    frequencies.
-4. If every site attaches to one of m spine compartments, the student's site
+4. If every site attaches to one of m spine compartments, the reduced model's site
    impedances are $P Z_\mathrm{comp} P^\top$, with rank at most m (plus the base).
    So the best rank-m approximation error of the FEM $Z$ (Eckart–Young)
-   **lower-bounds the error of any student with m spine compartments**,
+   **lower-bounds the error of any reduced model with m spine compartments**,
    whatever its configuration. The smallest m whose bound is below ε is a
    floor on the count.
 
@@ -318,8 +323,8 @@ The answer comes in two halves, which bracket the truth.
 7. The best error at each count traces the **achieved front**. Where it sits
    close to the lower bound, configuration is not the limitation. A large gap
    means the cable topology itself is the bottleneck.
-8. Build two achieved fronts: **tree-only** students (see "Loops without
-   loops") and **looped** students. The gap between them is the electrical
+8. Build two achieved fronts: **tree-only** reduced models (see "Loops without
+   loops") and **looped** reduced models. The gap between them is the electrical
    value of the loops.
 
 Report, per spine and per target behaviour, the lower-bound curve, the
@@ -339,7 +344,7 @@ matter functionally. This analysis makes the hypothesis testable.
 
 ## Loops without loops: tree realization *(proposal)*
 
-The student must reproduce the electrical relationships between the points
+The reduced model must reproduce the electrical relationships between the points
 that matter, not the wiring. So a geometric loop does not have to become a
 loop in the cable model.
 
@@ -381,9 +386,9 @@ resistances is indistinguishable at those ports.
    (resistances) are non-negative. Branch lengths become compartments, or
    half-resistances, in jaxley. Membrane is lumped onto port nodes in
    proportion to the FEM membrane nearest each port.
-4. Check the tree student against FEM across frequencies and with
+4. Check the tree-realized reduced model against FEM across frequencies and with
    conductance-synapse transients, then gradient-fit it like any other
-   student.
+   reduced model.
 
 **Default policy:** use **tree realization** by default, and fall back to
 literal loops (the jaxley private-API workaround, open question 8) only
@@ -401,11 +406,89 @@ fast tree solver and its public API for most models.
 - Real membrane is distributed along loop arms, so lumping it onto ports
   introduces a small error. The FEM check measures it.
 - The tree is exact only for the **declared ports**. New synapse locations
-  need a refit, consistent with principle 7.
+  need a refit, consistent with principle 7. See "Dependence on synapse
+  (PSD) locations" below.
 - Active channels distributed in spine membrane break the "linear between
   ports" argument (open question 20).
 - Neighbor-joining can return negative branch lengths, so they must be
   constrained.
+
+### Dependence on synapse (PSD) locations
+
+Tree realization, like any port-based reduction, **assumes the port
+locations are known**: the ports are the PSD patches. It is exact only for
+those ports. Synapses are expected to matter (the user's guess, and
+plausible given thin loop arms). So sensitivity to placement is measured,
+not assumed away. Three quantities, all computed on the reference model with
+`SiteSet` samplers:
+
+1. **Placement sensitivity of the spine itself.** How much do port
+   impedances ($Z_{ii}$, $Z_{i,\mathrm{base}}$, $Z_{ij}$) and the loopiness index change
+   when synapses move? Compare real positions against jittered positions
+   (geodesic jitter of a given radius), against `uniform` re-draws with the
+   same count and areas, and against `clustered` re-draws by axon. A large
+   spread means electrical behaviour depends strongly on exactly where the
+   synapses are.
+2. **Transfer error of a fixed reduced model.** Fit a tree to one site set,
+   then evaluate it on another (synapses mapped to the nearest port). This
+   measures how wrong a model becomes when synapse positions are unknown or
+   change, which is the situation for spines without synapse data.
+3. **Port-basis convergence.** Instead of synapse ports, use a dense,
+   placement-agnostic **port basis**: K evenly spread patches (Poisson-disk).
+   Any synapse is then mapped to its nearest basis port. Error against K
+   shows how many ports make a model placement-agnostic to within ε. This
+   is the fallback when PSD locations are unknown.
+
+These results also feed the generative model below. If placement matters
+little, spines can be generated without modelling synapse positions in
+detail. If it matters a lot, the generative model must produce ports and
+synapses jointly.
+
+## Toward a generative model of toric spines *(proposal, long-term)*
+
+**Motivation.** The long-term network model needs many space-specific cells.
+High-resolution morphology is scarce: one whole-cell EM mesh (`data/cell.obj`,
+with all 76 toric spines) and the 9 separately processed spine meshes. More
+imaging may come, but nothing else is likely to resolve spine-scale
+structure. So the plan is a **generative model for space-specific cells**
+that contains a **generative model for toric spines**. It is fitted on the
+reconstructed spines and used to make fully synthetic cells.
+
+**Key idea: generate electrical port models, not geometry.** If a spine's
+role in a simulation reduces to its ports related by an impedance (or
+resistance) matrix, then generating spines means generating **valid port
+models**. Tree realization gives a compact, always-valid parameterization:
+
+| Component | What is generated | Fitted from |
+|---|---|---|
+| Size | spine membrane area, volume | 76 spines in `cell.obj` (after spine segmentation) |
+| Port count | number of synapses (AZs), given size | Sanculi et al.: AZs vs area r² = 0.73; about 0.81 AZ/µm² |
+| Axon structure | axons per spine, synapses per axon | TS1 counts (`data/TS1_syn_axon_dist.txt`), paper statistics, synapse tables |
+| Tree topology | the port tree's shape | trees fitted to reconstructed spines. Phylogenetic tree priors (Yule / coalescent-type processes) are a natural model family |
+| Branch resistances, membrane per node | edge κ and node areas | fitted trees, conditioned on size and port count |
+| Residual loopiness | literal loops where trees fail | loopiness index distribution |
+| Neck | the base port's coupling to the parent | fitted neck resistance and area |
+
+Why trees: any sampled tree with non-negative branch resistances and
+positive membrane is a **physically valid** passive network. Sampling raw
+impedance matrices instead would need constraints to stay realizable: a
+symmetric reduced Laplacian with non-positive off-diagonals, or a metric
+satisfying the four-point condition. Generating in tree space gets validity
+for free, and the reduced model is jaxley-ready.
+
+**Validation of the generator:** held-out reconstructed spines (leave one
+out). Compare distributions of input resistance, spine-to-base transfer,
+cross-talk between synapses, summation index and loopiness between synthetic
+and real spines. Downstream, compare cell-level response distributions.
+
+**Prerequisites in camovox:**
+- a spine segmentation of the whole-cell mesh (the user has SDF-based
+  partition code, to be integrated);
+- the port-model export format for one spine: ports, tree, Z(f), metadata;
+- placement-sensitivity results (above).
+
+The generator itself is a later plan. The design choice now is that every
+fitted spine is saved as a **port model** that the generator can learn from.
 
 ## The reduction: FEM → effective MorphologyGraph *(proposal)*
 
@@ -542,6 +625,19 @@ scenarios.
 site to the surface and builds its patch. Sites farther than a tolerance
 from the membrane are reported, not silently moved.
 
+**Data available now** (see `data/README.md`). All files are in pixel
+coordinates, at 0.005 µm per pixel.
+- `TS*_AZ.txt`: active-zone (= PSD) points for 7 of the 9 spines (1 `x y z`
+  per line). They sit 0.03–0.16 µm off the spine surface (presynaptic side),
+  so the snapping tolerance must be about 0.2 µm. They carry no PSD areas,
+  so the area sampler stays a placeholder. `load_az(path, ref, scale=0.005)`
+  wraps `load_sites` for this format.
+- `TS1_syn_axon_dist.txt`: AZ indices grouped by axon. `load_az` attaches
+  `axon_id` from it when present.
+- `TS*_neckpoint.txt`: one or more neck points per spine (TS3 has 3, TS21
+  has 2). Each becomes a **base port** (`kind = "neck"`), and with several
+  necks a spine has several base ports to its parent.
+
 ### Patches
 
 A patch is a geodesic disk of surface triangles grown from the snapped point
@@ -614,8 +710,8 @@ seed = 7
 [locations]
 sampler = "clustered"
 n_axons = 10
-synapses_per_axon = { dist = "poisson", mean = 2.5 }   # placeholder until TS1 counts arrive
-# synapses_per_axon = { counts = [6, 4, 3, 3, 2, 2, 2, 1, 1, 1] }  # explicit form
+synapses_per_axon = { counts = [8, 4, 4, 2, 2, 1, 1, 1, 1, 1] }  # TS1 (data/TS1_syn_axon_dist.txt)
+# synapses_per_axon = { dist = "poisson", mean = 2.5 }  # distribution form
 total = 25
 cluster_scale_um = 0.5
 [areas]
@@ -802,7 +898,12 @@ been confirmed.
    - (b) a semi-infinite cable;
    - (c) grafting onto a whole-cell model.
 
-   The spine model is exported with a named port at its base either way.
+   The spine model is exported with a named port at each neck either way.
+   Spines with **several necks** (TS3: 3, TS21: 2, from the neck-point
+   files) need a boundary condition that couples the necks through the
+   parent, e.g. all necks attached to one shared sink, or to points along a
+   parent cable. Which one is right depends on where the necks land on the
+   real dendrite or soma. `cell.obj` can tell us.
 
 ### Refinement loop
 
@@ -829,7 +930,7 @@ been confirmed.
    regions produce small loopy networks, is SWC the primary deliverable or a
    compatibility export beside an exact graph format (JSON or NeuroML-like)?
 8. **What can jaxley express?** *(probed 2026-10-23 with jaxley 0.14.0. The
-   student must be a jaxley model. Literal loops are now the **fallback**:
+   reduced model must be a jaxley model. Literal loops are now the **fallback**:
    tree realization is the default, see "Loops without loops".)*
    - **Membrane area is independent of geometry.** `set("area", ...)` changes
      membrane conductance and capacitance without touching axial coupling.
@@ -880,9 +981,15 @@ been confirmed.
 
 ### Data, dependencies and interface
 
-15. **Data access**: do we have BF's whole-cell mesh
-    (`cell_wrapped_simplified_1cc.obj`), and when are the synapse tables
-    expected?
+15. **Data** *(partly answered; inventory in `data/README.md`)*:
+    `data/cell.obj` (whole cell, 330k faces, likely BF's
+    `cell_wrapped_simplified.obj`), the 9 TS meshes, and TS1's synapse-to-axon
+    grouping are present. Still to confirm:
+    - mesh units (5 nm pixels?) and provenance;
+    - whether `cell.obj` is the version where soma and spines form one
+      connected surface;
+    - when the synapse tables (positions, PSD areas, axon IDs) are expected,
+      and for which spines.
 16. **Your MCF skeleton code**: optional baseline or diagnostic?
 17. **Interface**: library + notebooks only, or also a CLI for batch runs?
 
@@ -903,6 +1010,18 @@ been confirmed.
     meshes): tolerate them in the reduction, require better-shaped meshes,
     or both, with a diagnostic? To be settled by experiment in the reduction
     plan.
+
+### Generative model (new)
+
+22. **Spine segmentation of `cell.obj`**: integrate the user's SDF-based
+    partition code into camovox (as a dependency, or ported into
+    `surface.py`)? Where does it live?
+23. **Synapse data beyond TS1**: are synapse positions available for spines
+    other than the 9 processed ones? If not, the generator's port statistics
+    rest on TS1/TS7-type tables plus paper-level counts.
+24. **Generator scope**: spines only, or the whole cell (soma, dendrite
+    branching, spine placement along dendrites)? Dendrites are presumably
+    lower-risk, since cable-like.
 
 ### Decided (kept here for context)
 
