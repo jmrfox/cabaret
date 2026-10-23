@@ -3,7 +3,7 @@
 A spine's ports (synapses + neck) are related by resistance distances (the
 resistance between two ports with membrane removed). If those distances are
 close to a **tree metric**, a tree of resistors with internal branch points
-reproduces them (see "Loops without loops" in ``docs/design.md``). This
+reproduces them (see ``docs/design/reduction.md``). This
 module:
 
 1. fits such a tree: neighbor-joining topology, then non-negative branch

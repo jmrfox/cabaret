@@ -2,6 +2,19 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-23: Design split into chapters; FEM physics written up
+**Context:** `docs/design.md` had grown to about 1,100 lines, mixed
+implemented and proposed material, and had no detailed account of the FEM
+physics the whole method rests on.
+**Decision:** The design now lives in `docs/design/`: a README (goal,
+terminology, principles, scope, pipeline with status) and one chapter per
+topic. The new `fem-reference.md` derives the reference model (governing
+equations, Robin membrane condition, weak form, P1 + lumped mass, the
+resistor-network view, solvers, ports and electrodes, validation, limits).
+Each chapter marks what is implemented and what is a proposal, with TS1
+numbers from plans 003–006. Open-question numbers 1–24 are kept.
+`docs/design.md` remains as a pointer with an old-section → chapter map.
+
 ## 2026-10-23: Fit in our own JAX solver, export to jaxley (plan 006)
 **Context:** The reduced model must run in jaxley, and it has to be fitted
 to FEM targets in the frequency domain (port impedance at DC, 100 Hz and
@@ -92,7 +105,7 @@ with 76 spines, plus 9 processed spines), and the long-term network model
 needs synthetic cells.
 **Decision:**
 - Terminology: **reference model** (FEM) and **reduced model** (the jaxley
-  cable model fitted to it), used throughout `design.md`. Earlier log
+  cable model fitted to it), used throughout the design docs. Earlier log
   entries are reworded to match.
 - Placement dependence is measured, not assumed away, in three ways:
   impedance spread under jittered and re-drawn synapses; the transfer error
@@ -198,7 +211,7 @@ converted to a surface (marching cubes + smoothing). The voxel finite-volume
 model is dropped from the core. Sites become patches of surface triangles.
 fTetWild (MPL-2.0) is the default mesher, and TetGen (AGPL) is optional.
 Rejected: keeping two reference models; voxel-only processing. New risks
-(mesher fidelity at necks, element quality) are tracked in `design.md`.
+(mesher fidelity at necks, element quality) are tracked in the design docs (`design/open-questions.md`).
 
 ## 2026-10-21: Activation patterns shared across backends
 **Context:** Validation needs standard stimuli anyway. Toric-spine questions
@@ -255,7 +268,7 @@ is obtained by coarse-graining that model: a potential-field partition, with
 conductances derived from flux. jaxley is used for simulation, validation and
 differentiable refinement. SWC export keeps MASCAF's cycle-breaking header
 convention. The proposed method and alternatives (pore-network partition,
-Kron reduction) are in `design.md`.
+Kron reduction) are in `design/reduction.md`.
 
 ## 2026-10-21: First draft of the design (superseded)
 **Context:** The design template was empty. The user described the pipeline

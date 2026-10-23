@@ -23,7 +23,7 @@ from camovox.circuit import CompartmentGraph
 from camovox.tet import TetMesh
 
 # µm². Literature-based guess: mammalian spine synapses average ~0.04 µm²
-# (Schikorski & Stevens 1997); no owl data. See design.md, "Area samplers".
+# (Schikorski & Stevens 1997); no owl data. See docs/design/sites-and-scenarios.md.
 PLACEHOLDER_PSD_AREA = 0.05
 
 

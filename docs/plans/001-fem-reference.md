@@ -1,8 +1,8 @@
 # 001: FEM reference model foundation
 
 **Status:** active
-**Design sections:** [Core concepts and data model](../design.md#core-concepts-and-data-model),
-[Pipeline](../design.md#pipeline), [Validation](../design.md#validation)
+**Design sections:** [FEM reference](../design/fem-reference.md),
+[Implementation](../design/implementation.md), [Validation](../design/validation.md)
 
 ## Goal
 

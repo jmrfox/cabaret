@@ -6,7 +6,8 @@
 # reproduce the electrical behaviour of a high-resolution 3D model of the
 # same cell. The 3D model is the **reference model**: a finite-element (FEM)
 # solution of current flow inside the cell's reconstructed surface. The full
-# rationale is in `docs/design.md`.
+# rationale is in `docs/design/` (start at its README; the physics is in
+# `docs/design/fem-reference.md`).
 #
 # **This notebook** checks that the reference model gives the right answers
 # on shapes with known solutions, and introduces the plots used in later
@@ -200,7 +201,7 @@ pl.show()
 # The planned reduction cuts a cell into compartments along **equipotential
 # surfaces** of a particular field: current injected at a root and leaving
 # through the membrane in proportion to area (the "λ → ∞" field; see
-# `docs/design.md`). With an almost zero leak (g_pas = 1e-8 S/cm²) membrane
+# `docs/design/reduction.md`). With an almost zero leak (g_pas = 1e-8 S/cm²) membrane
 # current is nearly proportional to area, so the solution approximates that
 # field. Because the leak is so small, the whole torus sits at a large,
 # meaningless offset voltage. Only differences matter, so we plot

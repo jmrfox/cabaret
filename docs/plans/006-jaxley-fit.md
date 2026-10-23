@@ -1,8 +1,8 @@
 # 006: Fit the reduced TS1 model and export it to jaxley
 
 **Status:** done
-**Design sections:** [Goal](../design.md#goal) (reference vs reduced
-model), open questions 6–8 in [design.md](../design.md)
+**Design sections:** [Goal](../design/README.md#goal) (reference vs reduced
+model), [Reduction](../design/reduction.md), open questions 6–8 in [open-questions.md](../design/open-questions.md)
 
 ## Goal
 

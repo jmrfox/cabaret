@@ -10,10 +10,11 @@ Folder-specific rules live in `tests/AGENTS.md` and `notebooks/AGENTS.md`.
 
 Work moves through files in `docs/`, so any agent can pick up any stage:
 
-1. **Design**: `docs/design.md` is the high-level design: goals, scope, concepts and an API sketch.
+1. **Design**: `docs/design/` is the high-level design, split into chapters. Start at
+   `docs/design/README.md` (goals, terminology, principles, scope, pipeline and a chapter index).
 2. **Plan**: each feature gets a plan in `docs/plans/NNN-short-name.md`, copied from
    `docs/plans/_template.md`. A plan is a checklist of small, verifiable steps.
-3. **Implement**: read `docs/design.md` and the active plan first. Tick off steps as
+3. **Implement**: read `docs/design/README.md`, the chapters the plan links, and the active plan first. Tick off steps as
    you finish them. If the work forces a design change, update the design or plan
    and record why in `docs/decisions.md`. Don't diverge from the design without recording it.
 4. **Document**: write docstrings, notebooks and the README.
@@ -37,7 +38,7 @@ camovox/   package source
 tests/          pytest tests (kept small, see tests/AGENTS.md)
 notebooks/      jupytext-paired notebooks (see notebooks/AGENTS.md)
 data/           local data, gitignored except data/README.md
-docs/           design.md, plans/, decisions.md
+docs/           design/, plans/, decisions.md
 ```
 
 ## Reuse before you write

@@ -1,9 +1,9 @@
 # 003: TS1 electrical portrait
 
 **Status:** done (first pass; follow-ups below)
-**Design sections:** [Effective complexity of a toric spine](../design.md#effective-complexity-of-a-toric-spine-proposal),
-[Loops without loops](../design.md#loops-without-loops-tree-realization-proposal),
-[Sites, sampling and scenarios](../design.md#sites-sampling-and-scenarios-proposal)
+**Design sections:** [Ports and complexity](../design/ports-and-complexity.md),
+[Reduction](../design/reduction.md),
+[Sites and scenarios](../design/sites-and-scenarios.md)
 
 ## Goal
 

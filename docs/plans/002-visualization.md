@@ -1,8 +1,8 @@
 # 002: Visualization of FEM solutions
 
 **Status:** done (pending the user's ParaView check)
-**Design sections:** [Validation](../design.md#validation),
-[Core concepts and data model](../design.md#core-concepts-and-data-model)
+**Design sections:** [Validation](../design/validation.md),
+[FEM reference](../design/fem-reference.md)
 
 ## Goal
 

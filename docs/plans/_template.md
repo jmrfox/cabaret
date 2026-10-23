@@ -1,7 +1,7 @@
 # NNN: <feature name>
 
 **Status:** draft | active | done
-**Design sections:** <links to the relevant parts of docs/design.md>
+**Design sections:** <links to the relevant chapters in docs/design/>
 
 ## Goal
 

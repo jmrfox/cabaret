@@ -1,7 +1,7 @@
 # 004: Neck ports from the cell mesh
 
 **Status:** active (neck ports done; tracing comparison and grafting next)
-**Design sections:** open questions 4 and 4b, 15 and 22 in [design.md](../design.md)
+**Design sections:** [Spines and the cell](../design/spines-and-cell.md); open questions 4, 4b, 15 and 22 in [open-questions.md](../design/open-questions.md)
 
 ## Goal
 

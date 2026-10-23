@@ -1,8 +1,8 @@
 # 005: First reduced model of TS1 (tree realization)
 
 **Status:** done
-**Design sections:** [Loops without loops](../design.md#loops-without-loops-tree-realization-proposal),
-[Effective complexity of a toric spine](../design.md#effective-complexity-of-a-toric-spine-proposal)
+**Design sections:** [Reduction](../design/reduction.md),
+[Ports and complexity](../design/ports-and-complexity.md)
 
 ## Goal
 

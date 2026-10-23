@@ -1,7 +1,7 @@
 # Questions for the anatomy/physiology experts (pinned, not yet sent)
 
 Drafted 2026-10-23 after a literature check. **On hold:** the user decided to
-continue with literature-based guesses (see `design.md`, "Area samplers") and
+continue with literature-based guesses (see `design/sites-and-scenarios.md`, "PSD area") and
 revisit these later, possibly as part of uncertainty quantification.
 
 ## Background from the literature check

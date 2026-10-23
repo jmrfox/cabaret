@@ -19,5 +19,5 @@ Notebooks live in `notebooks/` as jupytext pairs (`.py` + `.ipynb`). Edit the `.
 uv run jupytext --sync notebooks/*.py
 ```
 
-Project docs: [design](docs/design.md) · [plans](docs/plans/) · [decisions](docs/decisions.md).
+Project docs: [design](docs/design/README.md) · [plans](docs/plans/) · [decisions](docs/decisions.md).
 Instructions for AI agents: [AGENTS.md](AGENTS.md).
