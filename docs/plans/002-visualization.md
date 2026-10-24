@@ -16,7 +16,7 @@ Export to ParaView. Demonstrate it all in a notebook on test shapes.
       field (V) for a current injection (A).
 - [x] `fem.tet_gradient(tets, values)`: P1 gradient per tetrahedron.
       `fem.current_density(tets, v, params)` gives $J = -\nabla V / r_L$ in A/µm².
-- [x] `camovox/viz.py` (thin wrappers over PyVista and matplotlib):
+- [x] `cabaret/viz.py` (thin wrappers over PyVista and matplotlib):
       `to_pyvista`, `write_vtu`, `plot_surface`, `plot_slice`,
       `plot_isosurfaces`, `plot_streamlines`, `plot_sites`,
       `plot_mesh_quality`, `plot_profile`, `vertex_distance_along`.

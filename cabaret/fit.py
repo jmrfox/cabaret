@@ -1,6 +1,6 @@
 """Gradient-based fitting of tree models to reference port matrices (JAX).
 
-A tree model (see :mod:`camovox.reduce`) has a resistance per branch and a
+A tree model (see :mod:`cabaret.reduce`) has a resistance per branch and a
 membrane area per node. This module tunes both so the model's port
 impedance matrices match the FEM reference at a few frequencies.
 
@@ -17,8 +17,8 @@ from dataclasses import dataclass, replace
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from camovox.params import UM2_TO_CM2, Passive
-from camovox.reduce import PortTree
+from cabaret.params import UM2_TO_CM2, Passive
+from cabaret.reduce import PortTree
 
 
 def _jax():
@@ -124,7 +124,7 @@ def fit_tree_model(
     Parameters
     ----------
     tree : PortTree
-        Starting tree (e.g. from :func:`camovox.reduce.fit_tree`).
+        Starting tree (e.g. from :func:`cabaret.reduce.fit_tree`).
     node_area : (n,) array_like of float, in µm²
         Starting membrane per node. Its total is conserved.
     z_target : (F, P, P) array_like of complex, in Ω

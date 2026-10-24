@@ -14,7 +14,7 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from numpy.typing import ArrayLike, NDArray
 
-from camovox.params import Passive
+from cabaret.params import Passive
 
 
 @dataclass(frozen=True)

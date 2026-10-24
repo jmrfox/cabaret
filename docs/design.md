@@ -1,4 +1,4 @@
-# camovox: design (moved)
+# cabaret: design (moved)
 
 The design is now split into chapters in [`design/`](design/README.md).
 Start at [`design/README.md`](design/README.md).

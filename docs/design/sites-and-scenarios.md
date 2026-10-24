@@ -5,7 +5,7 @@ Back to the [design index](README.md).
 A **site** is a membrane patch where current enters or voltage is read
 (synapses, probes, landmarks). Real synapse data and sampled sites produce
 the same objects, so analyses don't change when data changes. Code:
-`camovox/sites.py` (`MembraneSurface`, `Sites`, `sites_from_points`,
+`cabaret/sites.py` (`MembraneSurface`, `Sites`, `sites_from_points`,
 `sample_uniform`, `jitter_sites`, `ball_patch`).
 
 ## Loading real data *(implemented)*
@@ -105,7 +105,7 @@ Does morphology relate to synapse placement? This is always run on the
 
 Activation patterns are tables of site, time and weight, plus a
 `SynapseModel` (kinetics, reversal, $g_\mathrm{max}$). They are defined on
-sites, so the same pattern drives the FEM, the camovox reduced model and
+sites, so the same pattern drives the FEM, the cabaret reduced model and
 jaxley.
 - **Pattern samplers:** `single_site`, `axon_synchronous` (jitter, release
   probability), `poisson_axons`, `random_subset`, planted patterns.

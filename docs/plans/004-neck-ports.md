@@ -18,7 +18,7 @@ parent placeholders. Then compare each spine's two tracings.
 - [x] Check the TS meshes at their neck points: no flat cut cap, and plane
       cross-sections are unstable (0.008–1.1 µm²). Neck points sit on the
       spine's side surface.
-- [x] `camovox/graft.py`:
+- [x] `cabaret/graft.py`:
   - `load_parts`;
   - `spine_parts`: parts with at least 50% of their vertices within 0.3 µm
     of the TS mesh;

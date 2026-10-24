@@ -34,7 +34,7 @@ in [`../questions-for-experts.md`](../questions-for-experts.md).
    error axis (worst-case or median relative error, which frequencies, which
    target behaviours)?
 6. *Answered:* the loop fits by gradient every iteration. The tree or field
-   reduction provides initialization and topology. Fitting uses camovox's
+   reduction provides initialization and topology. Fitting uses cabaret's
    own JAX port solver, and jaxley is the export and simulation target
    ([reduction.md](reduction.md)).
 
@@ -65,7 +65,7 @@ in [`../questions-for-experts.md`](../questions-for-experts.md).
      ring exactly (3e-13). The default `jaxley.dhs` solver assumes a tree.
 
    Remaining: is `jax.sparse` fast enough at population scale? Ask jaxley
-   upstream for supported loop edges? camovox would wrap the workaround in
+   upstream for supported loop edges? cabaret would wrap the workaround in
    one function, with jaxley pinned until then.
 9. **Compatibility with MASCAF:** reuse its SWC writer and cycle-header
    code, or reimplement the format?
@@ -101,7 +101,7 @@ in [`../questions-for-experts.md`](../questions-for-experts.md).
 
 18. **Population morphology:** will each of the 100+ simulated neurons be a
     reconstruction with its own spines, or receive spines from a **library**
-    of effective spine models? This decides whether camovox fits per cell or
+    of effective spine models? This decides whether cabaret fits per cell or
     builds a spine library.
 19. **Target behaviours:** somatic output only, or also local spine voltages
     and synapse interactions? This sets the fitting targets and largely
@@ -117,7 +117,7 @@ in [`../questions-for-experts.md`](../questions-for-experts.md).
 ## Generative model
 
 22. *Answered:* spine segmentation of `cell.obj` comes from neuromesh-cgal,
-    whose outputs camovox reads ([spines-and-cell.md](spines-and-cell.md)).
+    whose outputs cabaret reads ([spines-and-cell.md](spines-and-cell.md)).
 23. **Synapse data beyond the 7 spines:** if none, the generator's port
     statistics rest on TS tables plus paper-level counts.
 24. **Generator scope:** spines only, or the whole cell (soma, dendrite
@@ -138,7 +138,9 @@ in [`../questions-for-experts.md`](../questions-for-experts.md).
   (the DAB fill hid them).
 - **Activation patterns:** a thin, data-first layer defined on sites and
   shared across models.
-- **Package name:** keep `camovox` during development.
+- **Package name:** `cabaret` (Cable Approximation by REsistor Trees), renamed
+  from camovox. The PyPI/distribution name is `cabaret-neuro`, because
+  `cabaret` is taken on PyPI.
 
 ## Known limits and risks
 

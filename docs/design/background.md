@@ -10,7 +10,7 @@ Back to the [design index](README.md).
   tools failed on them.
 - **MASCAF** made cable fitting robust, but it remains hard, and its models
   were validated only geometrically. No high-resolution simulation was ever
-  used to check them. camovox adds that simulation (the FEM reference model).
+  used to check them. cabaret adds that simulation (the FEM reference model).
 - Synaptic input is rich, which is the reason for this effort: **TS1 has 25
   synapses from 10 presynaptic axons** and about 7 holes. With a single
   synapse per spine, a detailed model would hardly be needed.
@@ -36,7 +36,7 @@ Back to the [design index](README.md).
     "unsuccessful" for computational reasons.
 - The earlier simulation suite used **Arbor**
   ([jmrfox/toric_spines_sim](https://github.com/jmrfox/toric_spines_sim)).
-  camovox uses jaxley instead because:
+  cabaret uses jaxley instead because:
   1. it is used in the user's current research group;
   2. Arbor code for full-control simulation tends to be long and quirky, and
      we want to see whether jaxley is more concise;
@@ -122,7 +122,7 @@ directly. Voxels are only an input format.
 
 ## Ideas from other fields
 
-| Field | Idea | Use in camovox |
+| Field | Idea | Use in cabaret |
 |---|---|---|
 | Power systems / circuit theory | **Kron reduction** (Schur complement of the Laplacian). Exactly preserves effective resistances between the nodes kept (Dörfler & Bullo 2013) | Exact DC reduction onto ports; neck clamping is a Schur complement |
 | Spectral graph theory | **Effective-resistance sparsification** (Spielman & Srivastava 2011); Laplacian eigenmodes | Sparsify reduced networks; match slow passive modes |

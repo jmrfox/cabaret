@@ -1,13 +1,15 @@
-# camovox
+# cabaret
 
-Cable morphologies from voxels
+**CAB**le **A**pproximation by **RE**sistor **T**rees: reduced cable models of
+neurons from 3D reconstructions.
+Formerly `camovox`. Distribution name: `cabaret-neuro` (import as `cabaret`).
 
 ## Development
 
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync                  # create .venv and install camovox in editable mode
+uv sync                  # create .venv and install cabaret in editable mode
 uv run pytest            # run tests
 uv run ruff format .     # format
 uv run ruff check .      # lint

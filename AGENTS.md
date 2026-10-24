@@ -1,6 +1,6 @@
-# Agent instructions for camovox
+# Agent instructions for cabaret
 
-Cable morphologies from voxels
+Cable Approximation by REsistor Trees: reduced cable models from 3D reconstructions
 
 This file is the single source of rules for every AI agent working in this repo
 (Cursor, Claude, Codex, ChatGPT, etc.). The `CLAUDE.md` files only import it.
@@ -27,14 +27,14 @@ change, propose a short plan first.
 - Use `uv` for everything. Never call `pip`, `python` or `pytest` directly.
   - Run code: `uv run python ...`, `uv run pytest`, `uv run jupytext ...`
   - Add a dependency: `uv add <pkg>`. For dev-only: `uv add --dev <pkg>`
-- `uv sync` installs `camovox` in editable mode (hatchling), so
-  `import camovox` always reflects the current source.
+- `uv sync` installs `cabaret` in editable mode (hatchling), so
+  `import cabaret` always reflects the current source.
 - Never edit `.venv/` or `uv.lock` by hand.
 
 ## Layout
 
 ```
-camovox/   package source
+cabaret/   package source
 tests/          pytest tests (kept small, see tests/AGENTS.md)
 notebooks/      jupytext-paired notebooks (see notebooks/AGENTS.md)
 data/           local data, gitignored except data/README.md
@@ -72,7 +72,7 @@ around library calls.
 - Vectorize with numpy where it's natural. Don't contort code for speed until
   profiling shows it matters.
 - No hard-coded absolute paths. Take paths as arguments (`pathlib.Path`).
-- Private helpers start with `_`. Expose the public API in `camovox/__init__.py`.
+- Private helpers start with `_`. Expose the public API in `cabaret/__init__.py`.
 
 ## Testing
 

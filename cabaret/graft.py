@@ -23,12 +23,12 @@ import trimesh
 from numpy.typing import ArrayLike, NDArray
 from scipy.spatial import cKDTree
 
-from camovox.tet import TetMesh
+from cabaret.tet import TetMesh
 
 if TYPE_CHECKING:
-    from camovox.circuit import CompartmentGraph
-    from camovox.sites import MembraneSurface, Sites
-    from camovox.tet import FidelityReport
+    from cabaret.circuit import CompartmentGraph
+    from cabaret.sites import MembraneSurface, Sites
+    from cabaret.tet import FidelityReport
 
 
 def load_parts(directory: Path, scale: float = 1.0) -> list[trimesh.Trimesh]:
@@ -238,7 +238,7 @@ def load_spine(
     scale : float
         µm per pixel of the data files.
     edge_length, envelope : float, in µm
-        Meshing settings (see :func:`camovox.tetrahedralize`).
+        Meshing settings (see :func:`cabaret.tetrahedralize`).
     psd_area : float, in µm²
         Placeholder AZ patch area.
     contact_distance, contact_radius : float, in µm
@@ -253,11 +253,11 @@ def load_spine(
     ValueError
         If a neck has no contact with the cell.
     """
-    from camovox.circuit import add_electrode, point_port
-    from camovox.fem import fem_model
-    from camovox.io import load_axon_groups, load_mesh, load_points
-    from camovox.sites import MembraneSurface, sites_from_points
-    from camovox.tet import tetrahedralize_cached
+    from cabaret.circuit import add_electrode, point_port
+    from cabaret.fem import fem_model
+    from cabaret.io import load_axon_groups, load_mesh, load_points
+    from cabaret.sites import MembraneSurface, sites_from_points
+    from cabaret.tet import tetrahedralize_cached
 
     data_dir = Path(data_dir)
     mesh = load_mesh(data_dir / f"{name}.obj", scale=scale)

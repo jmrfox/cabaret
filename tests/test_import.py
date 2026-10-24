@@ -1,5 +1,5 @@
-import camovox
+import cabaret
 
 
 def test_import():
-    assert camovox.__version__
+    assert cabaret.__version__

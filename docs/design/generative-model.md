@@ -48,7 +48,7 @@ resistance, spine-to-neck transfer, cross-talk between synapses, summation
 index and loopiness between synthetic and real spines. Downstream, compare
 cell-level response distributions.
 
-## Prerequisites in camovox
+## Prerequisites in cabaret
 
 - spine segmentation of the whole-cell mesh: **available** (neuromesh-cgal
   parts, read by `graft.load_parts`);

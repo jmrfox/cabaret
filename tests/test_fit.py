@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-import camovox as cv
-from camovox import fit, jaxley_io, reduce
+import cabaret as cb
+from cabaret import fit, jaxley_io, reduce
 
-P = cv.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)
+P = cb.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)
 
 
 def _toy_tree():
@@ -18,11 +18,11 @@ def _toy_tree():
     )
 
 
-def test_jax_impedance_matches_camovox_solver():
+def test_jax_impedance_matches_cabaret_solver():
     tree, area = _toy_tree(), np.array([5.0, 0.5, 2.0, 3.0, 1.0])
     g = reduce.tree_to_graph(tree, P, area)
-    ref = cv.port_impedance(
-        g, P, [cv.point_port(g, int(n)) for n in tree.port_node], [0, 500]
+    ref = cb.port_impedance(
+        g, P, [cb.point_port(g, int(n)) for n in tree.port_node], [0, 500]
     )
     z = fit.port_impedance_jax(
         tree.edges, tree.resistance, area, tree.port_node, P, [0, 500]
@@ -54,7 +54,7 @@ def test_fit_recovers_perturbed_parameters():
 
 
 @pytest.mark.slow
-def test_jaxley_export_matches_camovox_transient():
+def test_jaxley_export_matches_cabaret_transient():
     import jax
 
     jax.config.update("jax_enable_x64", True)
@@ -65,8 +65,8 @@ def test_jaxley_export_matches_camovox_transient():
     dt = 0.025  # ms
     t = np.arange(0, 10, dt)
     i_pa = 50 * (t / 0.5) * np.exp(1 - t / 0.5)
-    w = cv.point_port(g, 2)
-    v_ref = cv.simulate_current(g, P, w, i_pa * 1e-12, dt * 1e-3, w[None])[:, 0] * 1e3
+    w = cb.point_port(g, 2)
+    v_ref = cb.simulate_current(g, P, w, i_pa * 1e-12, dt * 1e-3, w[None])[:, 0] * 1e3
     jm = jaxley_io.to_jaxley(tree, area, P)
     branch = jm.cell.branch(int(jm.branch_of_node[2])).comp(0)
     branch.stimulate(i_pa * 1e-3, verbose=False)

@@ -16,9 +16,9 @@ import numpy as np
 import scipy.sparse as sp
 from numpy.typing import ArrayLike, NDArray
 
-from camovox.circuit import CompartmentGraph
-from camovox.params import UM_TO_CM, Passive
-from camovox.tet import TetMesh
+from cabaret.circuit import CompartmentGraph
+from cabaret.params import UM_TO_CM, Passive
+from cabaret.tet import TetMesh
 
 
 @dataclass(frozen=True)

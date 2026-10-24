@@ -1,4 +1,4 @@
-# camovox design
+# cabaret design
 
 > A living set of documents. Update the relevant chapter when the design
 > changes, and log the reason in [`../decisions.md`](../decisions.md).
@@ -26,7 +26,7 @@ Pinned questions for the experts are in
 
 ## Goal
 
-camovox builds **effective cable models** of neurons from 3D reconstructions:
+cabaret builds **effective cable models** of neurons from 3D reconstructions:
 surface meshes, voxel segmentations or masks. An effective cable model need
 not match the cell's geometry. It must match the cell's **electrotonic
 behaviour**: input and transfer impedances, attenuation, time constants and
@@ -41,7 +41,7 @@ responses to synaptic input, as a multicompartmental simulator computes them.
   model that will actually be simulated, eventually in **populations of
   100+ neurons**, where FEM is not affordable.
 
-camovox makes the reduced model reproduce the reference model's behaviour at
+cabaret makes the reduced model reproduce the reference model's behaviour at
 the lowest compartment count:
 1. a physics-based reduction of the reference model gives the reduced
    model's topology and initial parameters;

@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 
-from camovox import ports, reduce
+from cabaret import ports, reduce
 
 
 def _random_tree_metric(rng, n_ports=7):

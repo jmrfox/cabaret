@@ -2,8 +2,8 @@
 
 from importlib.metadata import version
 
-from camovox import fit, graft, jaxley_io, ports, reduce, viz
-from camovox.circuit import (
+from cabaret import fit, graft, jaxley_io, ports, reduce, viz
+from cabaret.circuit import (
     CompartmentGraph,
     PortSolver,
     add_electrode,
@@ -16,10 +16,10 @@ from camovox.circuit import (
     time_constants,
     transfer_impedance,
 )
-from camovox.fem import FemReport, current_density, fem_model, tet_gradient
-from camovox.io import load_axon_groups, load_mesh, load_points
-from camovox.params import Passive
-from camovox.sites import (
+from cabaret.fem import FemReport, current_density, fem_model, tet_gradient
+from cabaret.io import load_axon_groups, load_mesh, load_points
+from cabaret.params import Passive
+from cabaret.sites import (
     MembraneSurface,
     Sites,
     ball_patch,
@@ -27,9 +27,9 @@ from camovox.sites import (
     sample_uniform,
     sites_from_points,
 )
-from camovox.tet import FidelityReport, TetMesh, tetrahedralize, tetrahedralize_cached
+from cabaret.tet import FidelityReport, TetMesh, tetrahedralize, tetrahedralize_cached
 
-__version__ = version("camovox")
+__version__ = version("cabaret-neuro")
 
 __all__ = [
     "CompartmentGraph",

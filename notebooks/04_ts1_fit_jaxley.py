@@ -25,11 +25,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-import camovox as cv
-from camovox import fit, graft, jaxley_io, ports, reduce
+import cabaret as cb
+from cabaret import fit, graft, jaxley_io, ports, reduce
 
 SCALE = 0.005  # µm per pixel
-MEMBRANE = cv.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)  # high-conductance, as before
+MEMBRANE = cb.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)  # high-conductance, as before
 FREQS = [0.0, 100.0, 1000.0]  # Hz
 
 # %% [markdown]
@@ -40,7 +40,7 @@ parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
 ts1 = graft.load_spine("TS1", "../data", parts, scale=SCALE)
 neck_port = ts1.neck_ports[0]
 port_patches = [neck_port, *ts1.az.patches]  # port 0 = neck, port k = AZ k−1
-z_fem = cv.port_impedance(ts1.spine, MEMBRANE, port_patches, FREQS)  # FEM targets
+z_fem = cb.port_impedance(ts1.spine, MEMBRANE, port_patches, FREQS)  # FEM targets
 
 distances = ports.ResistanceMetric(ts1.spine, MEMBRANE, ground=neck_port)
 tree = reduce.fit_tree(distances.distances(ts1.az.patches))
@@ -63,8 +63,8 @@ def start_areas(t: reduce.PortTree) -> np.ndarray:
 def clamped_error(t: reduce.PortTree, area: np.ndarray) -> float:
     """Neck-clamped port-matrix error against the FEM, averaged over FREQS."""
     g = reduce.tree_to_graph(t, MEMBRANE, area)
-    z = cv.port_impedance(
-        g, MEMBRANE, [cv.point_port(g, int(n)) for n in t.port_node], FREQS
+    z = cb.port_impedance(
+        g, MEMBRANE, [cb.point_port(g, int(n)) for n in t.port_node], FREQS
     )
     return float(
         np.mean(
@@ -161,10 +161,10 @@ for n, b, a in rows:
 #
 # Each panel overlays three simulations of the same input:
 # - **FEM** reference: the full 3D model, about 34,000 nodes;
-# - **reduced (camovox)**: the fitted 50-compartment tree in camovox's solver;
+# - **reduced (cabaret)**: the fitted 50-compartment tree in cabaret's solver;
 # - **reduced (jaxley)**: the same tree simulated by jaxley.
 #
-# What to look for: the jaxley and camovox curves should be identical (this
+# What to look for: the jaxley and cabaret curves should be identical (this
 # tests the export). Both should lie close to the FEM (this tests the
 # reduction).
 
@@ -180,12 +180,12 @@ t_ms = np.arange(0, 15, DT_MS)
 i_pa = 50 * (t_ms / 0.5) * np.exp(1 - t_ms / 0.5)  # α-function current, pA
 
 reduced_graph = reduce.tree_to_graph(full.tree, MEMBRANE, full.node_area)
-reduced_clamped = cv.attach_sink(
+reduced_clamped = cb.attach_sink(
     reduced_graph,
-    cv.point_port(reduced_graph, int(full.tree.port_node[0])),
+    cb.point_port(reduced_graph, int(full.tree.port_node[0])),
     resistance=NECK_SHUNT,
 )
-fem_clamped = cv.attach_sink(ts1.spine, neck_port, resistance=NECK_SHUNT)
+fem_clamped = cb.attach_sink(ts1.spine, neck_port, resistance=NECK_SHUNT)
 
 zc = ports.clamp_port(z_fem[0].real, 0)
 lobe = ports.electrical_groups(zc, 2)
@@ -197,11 +197,11 @@ fig, axs = plt.subplots(1, 3, figsize=(13, 3.6), sharey=True)
 for ax, (label, az_i) in zip(axs, cases.items(), strict=True):
     port = az_i + 1
     w_fem = ts1.az.patches[az_i]
-    v_fem = cv.simulate_current(
+    v_fem = cb.simulate_current(
         fem_clamped, MEMBRANE, w_fem, i_pa * 1e-12, DT_MS * 1e-3, w_fem[None]
     )[:, 0]
-    w_red = cv.point_port(reduced_graph, int(full.tree.port_node[port]))
-    v_red = cv.simulate_current(
+    w_red = cb.point_port(reduced_graph, int(full.tree.port_node[port]))
+    v_red = cb.simulate_current(
         reduced_clamped, MEMBRANE, w_red, i_pa * 1e-12, DT_MS * 1e-3, w_red[None]
     )[:, 0]
     jm = jaxley_io.to_jaxley(full.tree, full.node_area, MEMBRANE, root_shunt=NECK_SHUNT)
@@ -210,7 +210,7 @@ for ax, (label, az_i) in zip(axs, cases.items(), strict=True):
     site.record("v", verbose=False)
     v_jx = np.asarray(jx.integrate(jm.cell, delta_t=DT_MS))[0, 1:]  # drop t = 0
     ax.plot(t_ms, 1e3 * v_fem, lw=3, color="lightgray", label="FEM")
-    ax.plot(t_ms, 1e3 * v_red, lw=1.5, label="reduced (camovox)")
+    ax.plot(t_ms, 1e3 * v_red, lw=1.5, label="reduced (cabaret)")
     ax.plot(t_ms, v_jx, "--", lw=1.5, label="reduced (jaxley)")
     ax.set_title(f"AZ {az_i}: {label}")
     ax.set_xlabel("time (ms)")
@@ -225,7 +225,7 @@ fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# **Reading:** the jaxley and camovox traces coincide, so the export is exact.
+# **Reading:** the jaxley and cabaret traces coincide, so the export is exact.
 # Both follow the FEM closely in amplitude and time course, with EPSP peaks
 # within about 0.2%, though the 3D model has about 700 times more nodes.
 #

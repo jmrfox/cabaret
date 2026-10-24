@@ -2,6 +2,16 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-23: Renamed camovox → cabaret
+**Context:** "camovox" (cable morphologies from voxels) no longer described
+the project: voxels are only one input, and the core method is fitting
+resistor trees to a FEM reference.
+**Decision:** The package is now `cabaret` (Cable Approximation by REsistor
+Trees), with `import cabaret as cb`. `cabaret` is taken on PyPI by an
+unrelated package, so the distribution name is `cabaret-neuro`. The GitHub
+repo is renamed to match. Mentions of the old name in earlier log entries
+were updated so their file paths still resolve.
+
 ## 2026-10-23: Design split into chapters; FEM physics written up
 **Context:** `docs/design.md` had grown to about 1,100 lines, mixed
 implemented and proposed material, and had no detailed account of the FEM
@@ -22,11 +32,11 @@ to FEM targets in the frequency domain (port impedance at DC, 100 Hz and
 no FEM time-domain targets beyond what we generate ourselves.
 **Decision:**
 - Fit with a small dense differentiable port-impedance solver in JAX
-  (`camovox.fit`). Add `optax` for Adam.
-- Export the fitted tree to jaxley (`camovox.jaxley_io`): one compartment
+  (`cabaret.fit`). Add `optax` for Adam.
+- Export the fitted tree to jaxley (`cabaret.jaxley_io`): one compartment
   per node; edge resistance in `resistive_load_in`; branch-point load 1e-6;
   membrane via `area`.
-- Verify the export against camovox transients (`simulate_current`).
+- Verify the export against cabaret transients (`simulate_current`).
 
 Rejected: fitting through jaxley's time-domain simulation (slower; needs
 transient targets, and frequency-domain targets are complete for linear
@@ -76,7 +86,7 @@ and `mapbox-earcut` (only needed for capping plane cuts).
 
 ## 2026-10-23: No sink; isolated-spine multiports; neuromesh outputs
 **Context:** The Arbor suite attached a large sink to each spine so the
-sink's voltage could be read under many inputs. camovox's goal is a reduced
+sink's voltage could be read under many inputs. cabaret's goal is a reduced
 spine that behaves like the real one wherever it is attached. The TS
 meshes were traced separately from `cell.obj`. The user's neuromesh-cgal
 (C++/CGAL) already segments the cell into 91 capped, watertight parts.
@@ -90,7 +100,7 @@ meshes were traced separately from `cell.obj`. The user's neuromesh-cgal
 - In-situ validation swaps the cell's own version of a spine for the TS
   multiport at a neck cut.
 - The two tracings of each spine give a tracing-variability measure.
-- camovox reads neuromesh-cgal outputs (sidecars and part meshes), copied
+- cabaret reads neuromesh-cgal outputs (sidecars and part meshes), copied
   into `data/neuromesh/`, instead of reimplementing or wrapping the C++.
 
 Rejected: keeping a parameterized sink, whose placeholder values leak into
@@ -149,7 +159,7 @@ set independently of radius.
 **Decision:** Add `jaxley` (pinned `>=0.14,<0.15`, since the loop workaround
 touches the private `_comp_edges`). Loops are closed by appending
 compartment-to-compartment edges and using the `jax.sparse` voltage solver.
-This is wrapped in one camovox function so it can be swapped out if
+This is wrapped in one cabaret function so it can be swapped out if
 jaxley adds official support. Rejected: gap-junction synapses (unstable);
 our own JAX solver as the reduced-model simulator (it would lose jaxley's channel library
 and community).
@@ -221,7 +231,7 @@ same inputs driving the reference and the reduction.
 **Decision:** Add a thin, data-first `ActivationPattern` (site, time, weight,
 plus a `SynapseModel`), with samplers using `rng` and placeholder kinetics
 labelled as such. Patterns are defined on sites and applied unchanged to
-jaxley, the camovox solver, the voxel reference and FEM. Reference transients
+jaxley, the cabaret solver, the voxel reference and FEM. Reference transients
 reuse one factorization with low-rank (Woodbury) synapse updates. Rejected:
 (a) leaving all stimulation to user code, since references and reductions
 would then not share inputs; (c) a full protocol and analysis suite, which
@@ -254,7 +264,7 @@ same sites. Alternative rejected: waiting for real data before building the
 site-dependent stages.
 
 ## 2026-10-21: Effective (electrical) cable models, not geometric fitting
-**Context:** The user clarified the goal. camovox should produce cable models
+**Context:** The user clarified the goal. cabaret should produce cable models
 that are electrotonically equivalent to the voxel data, not geometrically
 close to it. A geometric route (skeleton + radius fitting) would rebuild
 MASCAF. The BF voxel study showed that a voxel finite-volume model is an
@@ -275,7 +285,7 @@ Kron reduction) are in `design/reduction.md`.
 as load → voxelize → cable model → SWC.
 **Decision:** Every input goes through a common `VoxelGrid` (binary volume
 with voxel size and origin, in µm). The cable model is a `networkx` graph
-with node radii. SWC writing is implemented in camovox, with navis/NeuroM
+with node radii. SWC writing is implemented in cabaret, with navis/NeuroM
 used only to validate the output. Skeletonization is delegated to `kimimaro`
 (TEASAR), with `scikit-image` + `skan` as the simple fallback. Rejected for
 now: mesh-native skeletonization (skeletor/CGAL), because it would bypass the

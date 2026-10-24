@@ -25,8 +25,8 @@ import networkx as nx
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from camovox.params import UM_TO_CM, Passive
-from camovox.reduce import PortTree
+from cabaret.params import UM_TO_CM, Passive
+from cabaret.reduce import PortTree
 
 
 @dataclass
@@ -76,7 +76,7 @@ def to_jaxley(
     root_shunt : float, optional, in Ω
         Extra resistance from the root to rest, added to its leak. A small
         value (e.g. 1 kΩ) holds the neck near rest, matching
-        ``attach_sink(..., resistance=root_shunt)`` on the camovox side.
+        ``attach_sink(..., resistance=root_shunt)`` on the cabaret side.
 
     Returns
     -------

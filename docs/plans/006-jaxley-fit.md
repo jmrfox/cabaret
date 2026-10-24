@@ -41,23 +41,23 @@ Turn plan 005's tree into a fitted reduced model and run it in jaxley:
 ## Steps
 
 - [x] Prototype the jaxley mapping on a 5-node tree: DC agreement 0.03%.
-- [x] `camovox/fit.py`: `port_impedance_jax`, `fit_tree_model`, `FitResult`
+- [x] `cabaret/fit.py`: `port_impedance_jax`, `fit_tree_model`, `FitResult`
       (Adam via optax; membrane as total × softmax).
-- [x] `camovox/jaxley_io.py`: `to_jaxley(tree, areas, params,
+- [x] `cabaret/jaxley_io.py`: `to_jaxley(tree, areas, params,
       root_shunt=...)` → `JaxleyModel`.
 - [x] `circuit.simulate_current`: backward-Euler transients for any network,
       including the full FEM (about 7 s for 600 steps on TS1).
 - [x] Fit the full TS1 tree and contracted trees, before vs after.
 - [x] Notebook `04_ts1_fit_jaxley.py` (about 65 s).
 - [x] Tests (`tests/test_fit.py`):
-  - JAX impedance = camovox solver;
+  - JAX impedance = cabaret solver;
   - the fit recovers perturbed parameters with total membrane conserved;
-  - the jaxley export matches the camovox transient (slow).
+  - the jaxley export matches the cabaret transient (slow).
 
 ## Done when
 
 - Notebook 04 shows fitted error against size, and a jaxley simulation of the
-  fitted TS1 model that matches the camovox solver.
+  fitted TS1 model that matches the cabaret solver.
 
 ## Results (TS1)
 
@@ -72,7 +72,7 @@ Turn plan 005's tree into a fitted reduced model and run it in jaxley:
   - AZ 16 (closest to neck): 0.386 vs 0.386 mV (−0.2%);
   - AZ 4 (most isolated): 1.526 vs 1.527 mV (−0.0%);
   - AZ 13 (other lobe): 1.146 vs 1.148 mV (−0.2%);
-  - jaxley identical to camovox.
+  - jaxley identical to cabaret.
 
   The whole-matrix 2.8% is mostly synapse-to-synapse cross-talk.
 

@@ -42,7 +42,7 @@ fair.
 ## Modules (as built)
 
 ```
-camovox/
+cabaret/
   params.py      Passive parameters, unit conversions
   io.py          load_mesh, load_points, load_axon_groups
   tet.py         TetMesh, tetrahedralize(_cached), fidelity report
@@ -64,17 +64,17 @@ Planned additions: `refine.py` (loop), `scenario.py`/`activation.py`,
 ## Workflow today (TS1, notebooks 02–04)
 
 ```python
-import camovox as cv
-from camovox import fit, graft, jaxley_io, ports, reduce
+import cabaret as cb
+from cabaret import fit, graft, jaxley_io, ports, reduce
 
-params = cv.Passive(r_L=100, c_m=1, g_pas=2.63e-4)  # high-conductance state
+params = cb.Passive(r_L=100, c_m=1, g_pas=2.63e-4)  # high-conductance state
 parts = graft.load_parts(data / "neuromesh/parts", scale=0.005)
 ts1 = graft.load_spine("TS1", data, parts)  # FEM, neck electrode, AZ sites
 neck = ts1.neck_ports[0]
 patches = [neck, *ts1.az.patches]  # port 0 = neck
 
 # Characterize: port matrices, distances, bounds
-z_fem = cv.port_impedance(ts1.spine, params, patches, freqs)
+z_fem = cb.port_impedance(ts1.spine, params, patches, freqs)
 metric = ports.ResistanceMetric(ts1.spine, params, ground=neck)
 d = metric.distances(ts1.az.patches)
 
@@ -91,9 +91,9 @@ model = jaxley_io.to_jaxley(result.tree, result.node_area, params)
 
 ```python
 rng = np.random.default_rng(0)
-sites = cv.sample_sites(ref, cv.Scenario.builtin("clustered_axons"), rng=rng)
-sites = cv.assign_roles(sites, test_frac=0.2, by="axon", rng=rng)  # locks test set
-refiner = cv.Refiner(
+sites = cb.sample_sites(ref, cb.Scenario.builtin("clustered_axons"), rng=rng)
+sites = cb.assign_roles(sites, test_frac=0.2, by="axon", rng=rng)  # locks test set
+refiner = cb.Refiner(
     ref,
     sites,
     params=params,
@@ -105,7 +105,7 @@ refiner = cv.Refiner(
 result = refiner.step()  # one iteration: model, error maps, export
 refiner.add_sites(more_sites)  # informed input
 model, history = refiner.run()  # to a stopping criterion
-score = cv.evaluate(model, ref, sites.test, params)  # once
+score = cb.evaluate(model, ref, sites.test, params)  # once
 ```
 
 ## Libraries

@@ -1,7 +1,7 @@
 # %% [markdown]
 # # 01 · The FEM reference model: checks and views
 #
-# **What camovox does.** It builds **reduced cable models** of neurons
+# **What cabaret does.** It builds **reduced cable models** of neurons
 # (compartmental models a simulator such as jaxley can run cheaply) that
 # reproduce the electrical behaviour of a high-resolution 3D model of the
 # same cell. The 3D model is the **reference model**: a finite-element (FEM)
@@ -44,9 +44,9 @@ import numpy as np
 import pyvista as pv
 import trimesh
 
-import camovox as cv
-from camovox import ports, viz
-from camovox import validate as va  # analytic reference solutions
+import cabaret as cb
+from cabaret import ports, viz
+from cabaret import validate as va  # analytic reference solutions
 
 pv.set_jupyter_backend("static")  # 3D views as static images in the notebook
 
@@ -54,8 +54,8 @@ pv.set_jupyter_backend("static")  # 3D views as static images in the notebook
 # - REST: a typical resting (slice) membrane.
 # - LEAKY: deliberately leakier than physiological, so voltage decay along a
 #   short test cylinder is large enough to see. It is a test setting only.
-REST = cv.Passive(r_L=100.0, c_m=1.0, g_pas=2.5e-5)
-LEAKY = cv.Passive(r_L=100.0, c_m=1.0, g_pas=1e-3)
+REST = cb.Passive(r_L=100.0, c_m=1.0, g_pas=2.5e-5)
+LEAKY = cb.Passive(r_L=100.0, c_m=1.0, g_pas=1e-3)
 I_INJ = 10e-12  # injected test current: 10 pA, in A
 
 # %% [markdown]
@@ -77,13 +77,13 @@ I_INJ = 10e-12  # injected test current: 10 pA, in A
 
 # %%
 sphere = trimesh.creation.icosphere(subdivisions=3, radius=8.0)  # µm
-sphere_tets, sphere_fidelity = cv.tetrahedralize(sphere, edge_length=2.0)
-sphere_model, _ = cv.fem_model(sphere_tets)  # FEM network on the mesh vertices
+sphere_tets, sphere_fidelity = cb.tetrahedralize(sphere, edge_length=2.0)
+sphere_model, _ = cb.fem_model(sphere_tets)  # FEM network on the mesh vertices
 
-patch = cv.ball_patch(sphere_model, center=[8.0, 0.0, 0.0], radius=1.0)
-rin_fem = cv.input_resistance(sphere_model, REST, patch)  # Ω
+patch = cb.ball_patch(sphere_model, center=[8.0, 0.0, 0.0], radius=1.0)
+rin_fem = cb.input_resistance(sphere_model, REST, patch)  # Ω
 rin_exact = va.sphere_input_resistance(8.0, REST)  # Ω
-tau_fem = cv.time_constants(sphere_model, REST, k=1)[0]  # slowest time constant, s
+tau_fem = cb.time_constants(sphere_model, REST, k=1)[0]  # slowest time constant, s
 
 print(
     f"mesh: {sphere_fidelity.n_tets} tetrahedra; surface area changed by "
@@ -115,11 +115,11 @@ print(f"time constant:    FEM {1e3 * tau_fem:.2f} ms, exact {1e3 * REST.tau_m:.2
 radius, length = 2.0, 100.0  # µm
 cylinder = trimesh.creation.cylinder(radius=radius, height=length, sections=24)
 # envelope: how far (µm) the meshed surface may deviate from the input surface
-cyl_tets, _ = cv.tetrahedralize(cylinder, edge_length=1.5, envelope=0.05)
-cyl_model, _ = cv.fem_model(cyl_tets)
+cyl_tets, _ = cb.tetrahedralize(cylinder, edge_length=1.5, envelope=0.05)
+cyl_model, _ = cb.fem_model(cyl_tets)
 
-end_patch = cv.ball_patch(cyl_model, center=[0.0, 0.0, -length / 2], radius=radius)
-v_cyl = cv.solve_dc(cyl_model, LEAKY, I_INJ * end_patch / end_patch.sum())  # V
+end_patch = cb.ball_patch(cyl_model, center=[0.0, 0.0, -length / 2], radius=radius)
+v_cyl = cb.solve_dc(cyl_model, LEAKY, I_INJ * end_patch / end_patch.sum())  # V
 print(f"length constant λ = {va.cable_length_constant(radius, LEAKY):.0f} µm")
 
 x = viz.vertex_distance_along(cyl_tets, axis=[0, 0, 1], origin=[0, 0, -length / 2])
@@ -169,14 +169,14 @@ pl.show()
 
 # %%
 torus = trimesh.creation.torus(major_radius=5.0, minor_radius=1.0)  # µm
-torus_tets, torus_fidelity = cv.tetrahedralize(torus, edge_length=0.6, envelope=0.03)
-torus_model, torus_quality = cv.fem_model(torus_tets)
+torus_tets, torus_fidelity = cb.tetrahedralize(torus, edge_length=0.6, envelope=0.03)
+torus_model, torus_quality = cb.fem_model(torus_tets)
 
-inject_patch = cv.ball_patch(
+inject_patch = cb.ball_patch(
     torus_model, center=[6.0, 0.0, 0.0], radius=0.5
 )  # outer rim
-v_torus = cv.solve_dc(torus_model, LEAKY, I_INJ * inject_patch / inject_patch.sum())
-j_torus = cv.current_density(torus_tets, v_torus, LEAKY)  # A/µm², one vector per tet
+v_torus = cb.solve_dc(torus_model, LEAKY, I_INJ * inject_patch / inject_patch.sum())
+j_torus = cb.current_density(torus_tets, v_torus, LEAKY)  # A/µm², one vector per tet
 print(f"mesh: {torus_fidelity.n_tets} tetrahedra")
 
 # %%
@@ -214,8 +214,8 @@ pl.show()
 # needed. Near the source the field is 3D and the surfaces bunch up.
 
 # %%
-NO_LEAK = cv.Passive(r_L=100.0, c_m=1.0, g_pas=1e-8)
-phi = cv.solve_dc(torus_model, NO_LEAK, I_INJ * inject_patch / inject_patch.sum())
+NO_LEAK = cb.Passive(r_L=100.0, c_m=1.0, g_pas=1e-8)
+phi = cb.solve_dc(torus_model, NO_LEAK, I_INJ * inject_patch / inject_patch.sum())
 pl = viz.plot_isosurfaces(
     torus_tets, 1e3 * (phi - phi.min()), n=12, name="phi - min (mV)"
 )
@@ -258,14 +258,14 @@ pl.show()
 # That choice of reference doesn't change resistance distances.
 
 # %%
-AXIAL_ONLY = cv.Passive(r_L=100.0)  # membrane is ignored for resistance distances
+AXIAL_ONLY = cb.Passive(r_L=100.0)  # membrane is ignored for resistance distances
 
 
 def rim_patches(angles_deg: list[float]) -> list[np.ndarray]:
     """0.4 µm patches on the torus's outer rim (radius 6 µm) at given angles."""
     a = np.deg2rad(angles_deg)
     centers = np.column_stack([6.0 * np.cos(a), 6.0 * np.sin(a), np.zeros(len(a))])
-    return [cv.ball_patch(torus_model, c, 0.4) for c in centers]
+    return [cb.ball_patch(torus_model, c, 0.4) for c in centers]
 
 
 for label, angles in [

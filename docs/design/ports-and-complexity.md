@@ -3,8 +3,8 @@
 Back to the [design index](README.md).
 
 How a spine is characterized electrically before any reduction, and what
-that says about the reduced model it needs. Code: `camovox/ports.py`,
-`camovox/circuit.py` (`port_impedance`, `PortSolver`). Applied to TS1 in
+that says about the reduced model it needs. Code: `cabaret/ports.py`,
+`cabaret/circuit.py` (`port_impedance`, `PortSolver`). Applied to TS1 in
 notebook 02 (plans 003–004).
 
 ## Port impedance matrices *(implemented)*

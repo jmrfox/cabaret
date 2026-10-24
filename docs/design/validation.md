@@ -6,7 +6,7 @@ Back to the [design index](README.md).
 
 1. **Analytic:** isopotential sphere ($R_\mathrm{in}$, $\tau$); sealed
    cylinder ($\cosh$ attenuation, $R_\mathrm{in} = r_a \lambda \coth(L/\lambda)$);
-   ball-and-stick; Rall equivalent cylinders. `camovox/validate.py` has the
+   ball-and-stick; Rall equivalent cylinders. `cabaret/validate.py` has the
    sphere and the sealed cylinder.
 2. **FEM reference:** agrees with level 1 and converges under mesh
    refinement, globally and locally at necks. Done for the sphere and
@@ -16,7 +16,7 @@ Back to the [design index](README.md).
    100 Hz and 1 kHz, and EPSPs at chosen synapses (TS1: 2.8% and 0.2%;
    [reduction.md](reduction.md)). With the refinement loop: on the **locked
    test set**, plus fresh uniform samples and `landmarks`.
-4. **jaxley:** the exported cell reproduces the camovox reduced model
+4. **jaxley:** the exported cell reproduces the cabaret reduced model
    exactly (plan 006).
 
 ## Metrics

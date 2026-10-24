@@ -2,8 +2,8 @@
 
 Back to the [design index](README.md).
 
-Code: `camovox/reduce.py` (trees), `camovox/fit.py` (fitting),
-`camovox/jaxley_io.py` (export). Notebooks 03 and 04 (plans 005, 006).
+Code: `cabaret/reduce.py` (trees), `cabaret/fit.py` (fitting),
+`cabaret/jaxley_io.py` (export). Notebooks 03 and 04 (plans 005, 006).
 
 ## Loops without loops: tree realization *(implemented, plan 005)*
 
@@ -135,8 +135,8 @@ setting them recomputes both. Never make them trainable on the exported
 cell.
 
 **Verification:** with an α current (50 pA, τ 0.5 ms) and the neck tied to
-rest, FEM, reduced (camovox) and reduced (jaxley) EPSPs agree within 0.2%
-at three synapses. jaxley and camovox are identical.
+rest, FEM, reduced (cabaret) and reduced (jaxley) EPSPs agree within 0.2%
+at three synapses. jaxley and cabaret are identical.
 
 **What jaxley can express** (probed with jaxley 0.14):
 - membrane area is independent of radius (`set("area")`);

@@ -3,7 +3,7 @@
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from camovox.params import UM2_TO_CM2, UM_TO_CM, Passive
+from cabaret.params import UM2_TO_CM2, UM_TO_CM, Passive
 
 
 def sphere_input_resistance(radius: float, params: Passive) -> float:

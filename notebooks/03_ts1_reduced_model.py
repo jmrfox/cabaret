@@ -16,7 +16,7 @@
 # 3. compare the result with the FEM at DC, 100 Hz and 1 kHz;
 # 4. **shrink** the tree and see how accuracy falls with model size.
 #
-# The reduced model here is evaluated with camovox's own solver. Exporting
+# The reduced model here is evaluated with cabaret's own solver. Exporting
 # it to jaxley and fine-tuning it with gradients is the next step (plan 006).
 #
 # **Placeholders** are as in notebook 02: 0.05 µm² per synapse patch. There
@@ -27,13 +27,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
 
-import camovox as cv
-from camovox import graft, ports, reduce, viz
+import cabaret as cb
+from cabaret import graft, ports, reduce, viz
 
 pv.set_jupyter_backend("static")
 
 SCALE = 0.005  # µm per pixel
-MEMBRANE = cv.Passive(
+MEMBRANE = cb.Passive(
     r_L=100.0, c_m=1.0, g_pas=2.63e-4
 )  # high-conductance, as in notebook 02
 FREQS = [0.0, 100.0, 1000.0]  # Hz, roughly the frequency content of synaptic signals
@@ -54,7 +54,7 @@ neck_port = ts1.neck_ports[0]
 port_patches = [neck_port, *ts1.az.patches]  # port 0 = neck, port k = AZ k−1
 port_names = ["neck"] + [f"AZ {i}" for i in range(len(ts1.az))]
 
-z_fem = cv.port_impedance(ts1.spine, MEMBRANE, port_patches, FREQS)  # (3, 26, 26) Ω
+z_fem = cb.port_impedance(ts1.spine, MEMBRANE, port_patches, FREQS)  # (3, 26, 26) Ω
 zc_fem = ports.clamp_port(
     z_fem[0].real, 0
 )  # neck clamped: the spine's internal structure
@@ -168,8 +168,8 @@ def node_areas(t: reduce.PortTree) -> np.ndarray:
 def reduced_port_matrix(t: reduce.PortTree) -> np.ndarray:
     """Port impedance matrix of a tree model at FREQS, ports in FEM order."""
     g = reduce.tree_to_graph(t, MEMBRANE, node_areas(t))
-    return cv.port_impedance(
-        g, MEMBRANE, [cv.point_port(g, int(n)) for n in t.port_node], FREQS
+    return cb.port_impedance(
+        g, MEMBRANE, [cb.point_port(g, int(n)) for n in t.port_node], FREQS
     )
 
 

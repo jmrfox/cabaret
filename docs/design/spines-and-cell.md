@@ -3,8 +3,8 @@
 Back to the [design index](README.md).
 
 How the separately traced toric spine (TS) meshes relate to the whole-cell
-mesh, and how a spine's neck port is defined. Code: `camovox/graft.py`,
-`camovox/io.py`. Data inventory: `data/README.md`. Plan 004.
+mesh, and how a spine's neck port is defined. Code: `cabaret/graft.py`,
+`cabaret/io.py`. Data inventory: `data/README.md`. Plan 004.
 
 ## The data
 
@@ -23,7 +23,7 @@ mesh, and how a spine's neck port is defined. Code: `camovox/graft.py`,
 - **Segmentation:** the user's
   [neuromesh-cgal](https://github.com/jmrfox/neuromesh-cgal) (CGAL SDF,
   graph-cut, SDF-aware merging) splits `cell.obj` into 91 watertight parts
-  with capped cuts. Segment 2 is the soma. camovox **reads its outputs**
+  with capped cuts. Segment 2 is the soma. cabaret **reads its outputs**
   (capped part OBJs, `.seg`/`.sdf` sidecars, copied to `data/neuromesh/`)
   and doesn't run it.
 - **Still missing:** real PSD areas (not coming; see the PSD guess), and

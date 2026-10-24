@@ -8,9 +8,9 @@ membrane. Every reduced model is judged against it. This chapter states the
 physics and its assumptions, how it is discretized, why the result is a
 resistor network, what is solved and how, and how sites and the neck enter.
 
-Code: `camovox/tet.py` (meshing), `camovox/fem.py` (assembly),
-`camovox/circuit.py` (networks and solvers), `camovox/sites.py` (patches),
-`camovox/graft.py` (neck electrodes).
+Code: `cabaret/tet.py` (meshing), `cabaret/fem.py` (assembly),
+`cabaret/circuit.py` (networks and solvers), `cabaret/sites.py` (patches),
+`cabaret/graft.py` (neck electrodes).
 
 ## 1. Physical model
 
@@ -57,7 +57,7 @@ which matters in spine heads, junctions and loops.
 - g_pas = 2.63×10⁻⁴ S/cm² (high-conductance, in vivo) or 2.5×10⁻⁵ S/cm²
   (resting, slice), as in the earlier voxel study (BF).
 
-Biophysical parameters are kept separate from geometry (`camovox.Passive`),
+Biophysical parameters are kept separate from geometry (`cabaret.Passive`),
 so one mesh serves any parameter set.
 
 ## 2. Weak form and discretization
@@ -122,7 +122,7 @@ same kind of object (`CompartmentGraph`: `area`, `position`, `edges`,
 `kappa`), solved by the same code. Comparisons between them are
 like-for-like.
 
-**Units** (`camovox.params`):
+**Units** (`cabaret.params`):
 - axial conductance g = κ · 10⁻⁴ / r_L (S), with κ in µm and r_L in Ω·cm;
 - membrane conductance g_pas · A · 10⁻⁸ (S), with A in µm²;
 - capacitance c_m · 10⁻⁶ · A · 10⁻⁸ (F).

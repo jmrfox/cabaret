@@ -13,8 +13,8 @@ from itertools import combinations
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from camovox.circuit import CompartmentGraph, PortSolver, attach_sink
-from camovox.params import Passive
+from cabaret.circuit import CompartmentGraph, PortSolver, attach_sink
+from cabaret.params import Passive
 
 
 class ResistanceMetric:

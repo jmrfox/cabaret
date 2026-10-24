@@ -35,8 +35,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
 
-import camovox as cv
-from camovox import graft, ports, viz
+import cabaret as cb
+from cabaret import graft, ports, viz
 
 pv.set_jupyter_backend("static")  # 3D views as static images in the notebook
 
@@ -60,7 +60,7 @@ pv.set_jupyter_backend("static")  # 3D views as static images in the notebook
 
 # %%
 SCALE = 0.005  # µm per pixel
-MEMBRANE = cv.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)
+MEMBRANE = cb.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)
 PSD_AREA = 0.05  # µm², placeholder
 CONTACT_DISTANCE, CONTACT_RADIUS = 0.2, 3.0  # µm
 EDGE, ENVELOPE = 0.2, 0.005  # µm
@@ -86,11 +86,11 @@ rng = np.random.default_rng(0)
 # `../data/cache/`; delete that file to re-mesh with other settings.
 
 # %%
-mesh = cv.load_mesh("../data/TS1.obj", scale=SCALE)
-tets, fidelity = cv.tetrahedralize_cached(
+mesh = cb.load_mesh("../data/TS1.obj", scale=SCALE)
+tets, fidelity = cb.tetrahedralize_cached(
     mesh, "../data/cache/TS1_e0.2_env0.005.npz", edge_length=EDGE, envelope=ENVELOPE
 )
-model, quality = cv.fem_model(tets)  # FEM network (one node per mesh vertex)
+model, quality = cb.fem_model(tets)  # FEM network (one node per mesh vertex)
 
 print(f"{fidelity.n_tets} tetrahedra, {model.n_nodes} mesh vertices")
 print(f"membrane area {fidelity.area_out:.1f} µm² ({100 * fidelity.area_error:+.2f}%)")
@@ -117,7 +117,7 @@ print(f"negative couplings carry {100 * quality.negative_fraction:.1f}% of total
 # %%
 parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
 own_parts = graft.spine_parts(mesh, parts)  # the cell's own tracing of TS1
-neck_points = cv.load_points("../data/TS1_neckpoint.txt", SCALE)
+neck_points = cb.load_points("../data/TS1_neckpoint.txt", SCALE)
 (contact,) = graft.neck_contacts(
     tets,
     parts,
@@ -126,8 +126,8 @@ neck_points = cv.load_points("../data/TS1_neckpoint.txt", SCALE)
     distance=CONTACT_DISTANCE,
     radius=CONTACT_RADIUS,
 )
-spine, neck_node = cv.add_electrode(model, contact)  # TS1 with its neck port
-neck_port = cv.point_port(spine, neck_node)  # port weights for the neck
+spine, neck_node = cb.add_electrode(model, contact)  # TS1 with its neck port
+neck_port = cb.point_port(spine, neck_node)  # port weights for the neck
 removed = model.area[contact].sum()
 print(f"cell parts that are TS1's own tracing: {own_parts.tolist()}")
 print(
@@ -151,13 +151,13 @@ print(
 # never on the removed neck region.
 
 # %%
-membrane = cv.MembraneSurface.from_model(tets, spine)  # real membrane, for patches
-az = cv.sites_from_points(
+membrane = cb.MembraneSurface.from_model(tets, spine)  # real membrane, for patches
+az = cb.sites_from_points(
     membrane,
-    cv.load_points("../data/TS1_AZ.txt", SCALE),
+    cb.load_points("../data/TS1_AZ.txt", SCALE),
     "synapse",
     area=PSD_AREA,
-    axon_groups=cv.load_axon_groups("../data/TS1_syn_axon_dist.txt"),
+    axon_groups=cb.load_axon_groups("../data/TS1_syn_axon_dist.txt"),
 )
 axon = az.table.axon_id.to_numpy(dtype=float)  # axon of each AZ, 0–9
 print(
@@ -204,7 +204,7 @@ pl.show()
 
 # %%
 freqs = [0.0, 100.0, 1000.0]  # Hz
-z = cv.port_impedance(
+z = cb.port_impedance(
     spine, MEMBRANE, [*az.patches, neck_port], freqs=freqs
 )  # (3, 26, 26), Ω
 z_dc = z[0].real
@@ -293,11 +293,11 @@ print(
     f"most isolated AZ: #{iso} (lobe {lobe[iso]}, axon {int(axon[iso])}), "
     f"{r_local[iso]:.1f} MΩ spine-local"
 )
-clamped = cv.attach_sink(
+clamped = cb.attach_sink(
     spine, neck_port, resistance=1.0
 )  # neck held at rest (1 Ω to ground)
 w = az.patches[iso]
-v = cv.solve_dc(clamped, MEMBRANE, I_INJ * w / w.sum())[
+v = cb.solve_dc(clamped, MEMBRANE, I_INJ * w / w.sum())[
     : len(tets.points)
 ]  # V, mesh vertices
 pl = viz.plot_surface(tets, 1e3 * v, name="V (mV), 10 pA into the most isolated AZ")
@@ -450,9 +450,9 @@ pl.show()
 min_spacing = 0.2  # µm, see above
 
 
-def random_sites() -> cv.Sites:
+def random_sites() -> cb.Sites:
     """One uniform re-draw of 25 synapse sites."""
-    return cv.sample_uniform(
+    return cb.sample_uniform(
         membrane,
         len(az),
         rng,
@@ -465,7 +465,7 @@ d_uniform = [distances.distances(random_sites().patches) for _ in range(100)]
 jitter_radii = [0.25, 0.5, 1.0, 2.0]  # µm along the surface
 d_jitter = {
     r: [
-        distances.distances(cv.jitter_sites(membrane, az, r, rng).patches)
+        distances.distances(cb.jitter_sites(membrane, az, r, rng).patches)
         for _ in range(30)
     ]
     for r in jitter_radii
@@ -549,7 +549,7 @@ plt.show()
 # histograms would separate.
 
 # %%
-solver = cv.PortSolver(clamped, MEMBRANE)  # neck at rest; factorized once, reused
+solver = cb.PortSolver(clamped, MEMBRANE)  # neck at rest; factorized once, reused
 r_local_uniform = [np.diag(solver.impedance(random_sites().patches)) for _ in range(30)]
 r_local_uniform = np.concatenate(r_local_uniform) / 1e6  # MΩ
 

@@ -9,7 +9,7 @@
 Build a reduced passive model of TS1, a tree of resistors with membrane on
 its nodes, from the FEM reference model. Measure how well it reproduces the
 FEM port behaviour across frequencies, and trace error against model size.
-Everything runs in camovox's own solver. Export to jaxley and gradient
+Everything runs in cabaret's own solver. Export to jaxley and gradient
 fitting are plan 006.
 
 ## Steps
@@ -18,7 +18,7 @@ fitting are plan 006.
       resistance per port (D) plus m shared compartments (L Lᵀ), from
       alternating principal-axis factoring. It estimates a local optimum and
       is not certified.
-- [x] `camovox/reduce.py`:
+- [x] `cabaret/reduce.py`:
   - `PortTree`;
   - `fit_tree`: Biopython neighbor-joining topology, then `scipy.optimize.nnls`
     branch resistances over all port pairs;

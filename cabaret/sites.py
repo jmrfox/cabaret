@@ -19,8 +19,8 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
-from camovox.circuit import CompartmentGraph
-from camovox.tet import TetMesh
+from cabaret.circuit import CompartmentGraph
+from cabaret.tet import TetMesh
 
 # µm². Literature-based guess: mammalian spine synapses average ~0.04 µm²
 # (Schikorski & Stevens 1997); no owl data. See docs/design/sites-and-scenarios.md.
@@ -238,7 +238,7 @@ def sites_from_points(
         Maximum distance from a point to the membrane. AZ points lie up to
         about 0.16 µm off the TS meshes (presynaptic side).
     axon_groups : list of list of int, optional
-        0-based point indices per axon (see :func:`camovox.io.load_axon_groups`).
+        0-based point indices per axon (see :func:`cabaret.io.load_axon_groups`).
     source : str
         Provenance label.
 

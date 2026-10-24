@@ -1,7 +1,7 @@
 [project]
-name = "camovox"
+name = "cabaret-neuro"  # PyPI name; the import name is `cabaret`
 version = "0.1.0"
-description = "Cable morphologies from voxels"
+description = "Cable Approximation by REsistor Trees: reduced cable models from 3D reconstructions"
 readme = "README.md"
 authors = [{ name = "Jordan M. R. Fox", email = "jfox@sdsu.edu" }]
 requires-python = ">=3.12"
@@ -22,6 +22,9 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cabaret"]
 
 [dependency-groups]
 dev = [

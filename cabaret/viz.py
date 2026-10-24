@@ -14,14 +14,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from camovox.circuit import CompartmentGraph
-from camovox.tet import TetMesh
+from cabaret.circuit import CompartmentGraph
+from cabaret.tet import TetMesh
 
 if TYPE_CHECKING:
     import matplotlib.axes
     import pyvista as pv
 
-    from camovox.reduce import PortTree
+    from cabaret.reduce import PortTree
 
 
 def to_pyvista(
@@ -288,7 +288,7 @@ def plot_streamlines(
     ----------
     tets : TetMesh
     vectors : (M, 3) array_like of float
-        Vector per tetrahedron, e.g. from :func:`camovox.fem.current_density`.
+        Vector per tetrahedron, e.g. from :func:`cabaret.fem.current_density`.
     source_center : (3,) sequence of float, in µm
         Centre of the seed sphere (e.g. the injection site).
     source_radius : float, in µm
@@ -471,7 +471,7 @@ def plot_port_tree(
 
     Parameters
     ----------
-    tree : camovox.reduce.PortTree
+    tree : cabaret.reduce.PortTree
     labels : sequence of str
         One label per port, in port order.
     colors : sequence of float, optional

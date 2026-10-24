@@ -10,7 +10,7 @@ module:
    resistances by least squares;
 2. simplifies it by merging short branches, which gives smaller models;
 3. puts the FEM membrane onto the tree's nodes;
-4. turns the result into a :class:`~camovox.circuit.CompartmentGraph` that
+4. turns the result into a :class:`~cabaret.circuit.CompartmentGraph` that
    the same solvers can evaluate against the FEM.
 """
 
@@ -22,8 +22,8 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import nnls
 
-from camovox.circuit import CompartmentGraph, PortSolver
-from camovox.params import UM_TO_CM, Passive
+from cabaret.circuit import CompartmentGraph, PortSolver
+from cabaret.params import UM_TO_CM, Passive
 
 
 @dataclass(frozen=True)
@@ -110,7 +110,7 @@ def fit_tree(d: ArrayLike) -> PortTree:
     ----------
     d : (P, P) array_like of float, in Ω
         Symmetric port distance matrix (e.g. from
-        :class:`camovox.ports.ResistanceMetric`, neck = port 0).
+        :class:`cabaret.ports.ResistanceMetric`, neck = port 0).
 
     Returns
     -------
@@ -223,7 +223,7 @@ def assign_membrane(
     (N,) ndarray of int
         For every node: 0 = ground port, k = patch k−1, −1 = no membrane.
     """
-    from camovox.circuit import _normalize, attach_sink
+    from cabaret.circuit import _normalize, attach_sink
 
     clamped = attach_sink(graph, ground, resistance=1.0)
     solver = PortSolver(clamped, params)

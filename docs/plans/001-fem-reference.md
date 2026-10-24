@@ -16,19 +16,19 @@ analytic solutions for a sphere and a sealed cylinder.
 - [x] Add dependencies: `scipy`, `trimesh`, `scikit-fem`, `pytetwild`
       (fTetWild), and `pyvista`, which pytetwild imports unconditionally.
       Logged in `decisions.md`.
-- [x] `camovox/params.py`: `Passive` ($r_L$ in Ω·cm, $c_m$ in µF/cm²,
+- [x] `cabaret/params.py`: `Passive` ($r_L$ in Ω·cm, $c_m$ in µF/cm²,
       $g_\mathrm{pas}$ in S/cm²) with unit conversions to SI.
-- [x] `camovox/circuit.py`: `CompartmentGraph`, Laplacian and system
+- [x] `cabaret/circuit.py`: `CompartmentGraph`, Laplacian and system
       matrix, `transfer_impedance` (DC and AC), `input_resistance`,
       `time_constants` (shift-invert eigenproblem; singular $C$ handled).
-- [x] `camovox/io.py`: `load_mesh(path, scale)`.
-- [x] `camovox/tet.py`: `tetrahedralize(mesh, edge_length, envelope)` →
+- [x] `cabaret/io.py`: `load_mesh(path, scale)`.
+- [x] `cabaret/tet.py`: `tetrahedralize(mesh, edge_length, envelope)` →
       `TetMesh` + `FidelityReport` (area and volume before and after).
-- [x] `camovox/fem.py`: `fem_model(tets)` → `CompartmentGraph` (κ = −K from
+- [x] `cabaret/fem.py`: `fem_model(tets)` → `CompartmentGraph` (κ = −K from
       the P1 stiffness, lumped boundary area) + `FemReport` (negative
       couplings).
-- [x] `camovox/sites.py` (placeholder): `ball_patch(graph, center, radius)`.
-- [x] `camovox/validate.py`: analytic sphere and sealed-cylinder references.
+- [x] `cabaret/sites.py` (placeholder): `ball_patch(graph, center, radius)`.
+- [x] `cabaret/validate.py`: analytic sphere and sealed-cylinder references.
 - [x] Tests (`tests/test_fem.py`, marked slow): sphere $R_\mathrm{in}$ and $\tau$;
       sealed-cylinder $R_\mathrm{in}$ and end-to-end attenuation.
 - [ ] Surface repair and checks (`surface.py`): watertightness, components,
