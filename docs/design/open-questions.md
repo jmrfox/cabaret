@@ -138,8 +138,8 @@ in [`../questions-for-experts.md`](../questions-for-experts.md).
   (the DAB fill hid them).
 - **Activation patterns:** a thin, data-first layer defined on sites and
   shared across models.
-- **Package name:** `cabaret` (Cable Approximation by REsistor Trees), renamed
-  from camovox. The PyPI/distribution name is `cabaret-neuro`, because
+- **Package name:** `cabaret` (Cable Approximation by REsistor Trees). The
+  PyPI/distribution name is `cabaret-neuro`, because
   `cabaret` is taken on PyPI.
 
 ## Known limits and risks

@@ -2,15 +2,12 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
-## 2026-10-23: Renamed camovox → cabaret
-**Context:** "camovox" (cable morphologies from voxels) no longer described
-the project: voxels are only one input, and the core method is fitting
-resistor trees to a FEM reference.
-**Decision:** The package is now `cabaret` (Cable Approximation by REsistor
+## 2026-10-23: Package named cabaret
+**Context:** The name should describe the core method, fitting resistor
+trees to a FEM reference, rather than any one input format.
+**Decision:** The package is `cabaret` (Cable Approximation by REsistor
 Trees), with `import cabaret as cb`. `cabaret` is taken on PyPI by an
-unrelated package, so the distribution name is `cabaret-neuro`. The GitHub
-repo is renamed to match. Mentions of the old name in earlier log entries
-were updated so their file paths still resolve.
+unrelated package, so the distribution name is `cabaret-neuro`.
 
 ## 2026-10-23: Design split into chapters; FEM physics written up
 **Context:** `docs/design.md` had grown to about 1,100 lines, mixed

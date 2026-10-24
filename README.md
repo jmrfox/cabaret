@@ -2,7 +2,7 @@
 
 **CAB**le **A**pproximation by **RE**sistor **T**rees: reduced cable models of
 neurons from 3D reconstructions.
-Formerly `camovox`. Distribution name: `cabaret-neuro` (import as `cabaret`).
+Distribution name: `cabaret-neuro` (import as `cabaret`).
 
 ## Development
 
