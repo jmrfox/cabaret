@@ -212,6 +212,8 @@ def load_spine(
     scale: float = 0.005,
     edge_length: float = 0.2,
     envelope: float = 0.005,
+    coarsen: bool = False,
+    tets: TetMesh | None = None,
     psd_area: float = 0.05,
     contact_distance: float = 0.2,
     contact_radius: float = 3.0,
@@ -239,6 +241,12 @@ def load_spine(
         µm per pixel of the data files.
     edge_length, envelope : float, in µm
         Meshing settings (see :func:`cabaret.tetrahedralize`).
+    coarsen : bool
+        fTetWild coarsening (see :func:`cabaret.tetrahedralize`). Cached
+        under its own file name.
+    tets : TetMesh, optional
+        Use this volume mesh instead of meshing (e.g. a refined mesh for a
+        convergence study). The meshing settings are then ignored.
     psd_area : float, in µm²
         Placeholder AZ patch area.
     contact_distance, contact_radius : float, in µm
@@ -257,14 +265,20 @@ def load_spine(
     from cabaret.fem import fem_model
     from cabaret.io import load_axon_groups, load_mesh, load_points
     from cabaret.sites import MembraneSurface, sites_from_points
-    from cabaret.tet import tetrahedralize_cached
+    from cabaret.tet import _fidelity, tetrahedralize_cached
 
     data_dir = Path(data_dir)
     mesh = load_mesh(data_dir / f"{name}.obj", scale=scale)
-    cache = data_dir / "cache" / f"{name}_e{edge_length:g}_env{envelope:g}.npz"
-    tets, fidelity = tetrahedralize_cached(
-        mesh, cache, edge_length=edge_length, envelope=envelope
-    )
+    if tets is None:
+        suffix = "_coarse" if coarsen else ""
+        cache = (
+            data_dir / "cache" / f"{name}_e{edge_length:g}_env{envelope:g}{suffix}.npz"
+        )
+        tets, fidelity = tetrahedralize_cached(
+            mesh, cache, edge_length=edge_length, envelope=envelope, coarsen=coarsen
+        )
+    else:
+        fidelity = _fidelity(mesh, tets)
     model, _ = fem_model(tets)
     own = spine_parts(mesh, parts)
     necks = load_points(data_dir / f"{name}_neckpoint.txt", scale)

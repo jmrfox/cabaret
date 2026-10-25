@@ -46,6 +46,23 @@ class TetMesh:
         with np.load(Path(path)) as f:
             return cls(points=f["points"], tets=f["tets"].astype(np.int64))
 
+    def refined(self) -> "TetMesh":
+        """Split every tetrahedron into eight (uniform refinement).
+
+        New vertices sit at edge midpoints, so the boundary stays the same
+        piecewise-flat surface. Use it for convergence studies: the geometry
+        is unchanged and only the resolution doubles.
+
+        Returns
+        -------
+        TetMesh
+            About 8× the tetrahedra and 6–7× the vertices.
+        """
+        from skfem import MeshTet
+
+        m = MeshTet(self.points.T, self.tets.T).refined()
+        return TetMesh(points=m.p.T.copy(), tets=m.t.T.astype(np.int64))
+
     def boundary_faces(self) -> NDArray[np.int64]:
         """Triangles that belong to exactly one tetrahedron.
 
@@ -120,6 +137,7 @@ def tetrahedralize(
     edge_length: float,
     envelope: float | None = None,
     optimize: bool = True,
+    coarsen: bool = False,
 ) -> tuple[TetMesh, FidelityReport]:
     """Fill a closed surface with tetrahedra using fTetWild.
 
@@ -135,6 +153,9 @@ def tetrahedralize(
         neck radius. PLACEHOLDER: no automatic check against neck size yet.
     optimize : bool
         Run fTetWild's element-quality optimization.
+    coarsen : bool
+        Let fTetWild coarsen the mesh as far as the envelope and quality
+        allow, instead of keeping elements near ``edge_length``.
 
     Returns
     -------
@@ -157,6 +178,7 @@ def tetrahedralize(
         edge_length_abs=edge_length,
         epsilon=envelope / diag,
         optimize=optimize,
+        coarsen=coarsen,
         quiet=True,
     )
     used, inverse = np.unique(tets, return_inverse=True)
@@ -181,6 +203,7 @@ def tetrahedralize_cached(
     edge_length: float,
     envelope: float | None = None,
     optimize: bool = True,
+    coarsen: bool = False,
 ) -> tuple[TetMesh, FidelityReport]:
     """Like :func:`tetrahedralize`, but reuse a mesh saved at ``cache``.
 
@@ -193,7 +216,7 @@ def tetrahedralize_cached(
         Closed surface, in µm.
     cache : pathlib.Path
         ``.npz`` file to read if it exists, otherwise to write.
-    edge_length, envelope, optimize
+    edge_length, envelope, optimize, coarsen
         See :func:`tetrahedralize`.
 
     Returns
@@ -205,7 +228,7 @@ def tetrahedralize_cached(
     if cache.exists():
         tm = TetMesh.load(cache)
         return tm, _fidelity(mesh, tm)
-    tm, report = tetrahedralize(mesh, edge_length, envelope, optimize)
+    tm, report = tetrahedralize(mesh, edge_length, envelope, optimize, coarsen)
     cache.parent.mkdir(parents=True, exist_ok=True)
     tm.save(cache)
     return tm, report
