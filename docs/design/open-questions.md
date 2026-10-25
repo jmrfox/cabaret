@@ -62,7 +62,12 @@ in [`../questions-for-experts.md`](../questions-for-experts.md).
      is too stiff (time constant about 1e-4 ms against dt = 0.025 ms).
      Appending rows to the private `cell._comp_edges`, re-running
      `_init_solvers()` and using `voltage_solver="jax.sparse"` reproduces a
-     ring exactly (3e-13). The default `jaxley.dhs` solver assumes a tree.
+     ring exactly (3e-13). The default `jaxley.dhs` solver assumes a tree,
+     and on a looped cell it returns wrong voltages without warning.
+   - *Implemented (plan 007):* `to_jaxley(..., loops=...)` closes loops
+     through dummy compartments, because an extra edge's resistance comes
+     from its ends' resistive loads; `jaxley_io.integrate` forces
+     `jax.sparse`.
 
    Remaining: is `jax.sparse` fast enough at population scale? Ask jaxley
    upstream for supported loop edges? cabaret would wrap the workaround in

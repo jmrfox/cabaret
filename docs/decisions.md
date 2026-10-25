@@ -2,6 +2,21 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-25: Loops in jaxley through dummy compartments (plan 007)
+**Context:** In jaxley 0.14 an extra compartment edge has no conductance of
+its own: its resistance is one end's `resistive_load_out` plus the other
+end's `resistive_load_in`, and our export already uses `resistive_load_in`
+for each parent edge. jaxley's default `jaxley.dhs` solver returns wrong
+voltages for a looped cell without any warning.
+**Decision:** `to_jaxley(..., loops=...)` gives each loop a–b a dummy
+compartment without membrane under a, holding R/2 in its
+`resistive_load_in`, and `close_loop` joins it to b with an edge oriented to
+use that same load. `jaxley_io.integrate` forces `jax.sparse` for looped
+models and refuses other solvers. This matches a cabaret ring to 3e-8 and a
+Kron-reduced FEM torus to 2e-6. Rejected: forking jaxley to give edges
+their own trainable conductance (1–2 weeks plus upkeep on each release); an
+upstream issue asking for public loop support is drafted instead.
+
 ## 2026-10-23: Package named cabaret
 **Context:** The name should describe the core method, fitting resistor
 trees to a FEM reference, rather than any one input format.

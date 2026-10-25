@@ -130,6 +130,15 @@ area so the model's port matrices match the FEM's.
   with reversal 0;
 - an optional `root_shunt` ties the neck to rest, matching `attach_sink`.
 
+**Loops** *(implemented, plan 007)*: `loops=[(a, b, R), ...]` closes extra
+edges on the tree. Each gets a dummy compartment without membrane under a,
+holding R/2 in `resistive_load_in`, and `close_loop` joins it to b through
+the private `_comp_edges` table, oriented to reuse that load. Looped models
+must run on `jax.sparse` (`jaxley_io.integrate` enforces it), since
+`jaxley.dhs` assumes a tree and is silently wrong otherwise. Verified
+against a cabaret ring (3e-8) and a FEM torus Kron-reduced at DC to four
+electrode ports (2e-6; the tree alone is 18% off).
+
 Radius and length are set to dummy values *before* area and loads, because
 setting them recomputes both. Never make them trainable on the exported
 cell.
