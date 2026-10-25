@@ -1,7 +1,7 @@
 """Export tree models to jaxley.
 
 Each tree node becomes a one-compartment jaxley branch, rooted at a chosen
-port (the neck). The mapping is exact for a resistor tree:
+port (e.g. a spine's neck). The mapping is exact for a resistor tree:
 
 - a branch's ``resistive_load_in`` carries the resistance of its edge to
   its parent. jaxley turns a resistive load into a resistance as

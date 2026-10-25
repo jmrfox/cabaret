@@ -28,7 +28,7 @@ import numpy as np
 import pyvista as pv
 
 import cabaret as cb
-from cabaret import graft, ports, reduce, viz
+from cabaret import graft, ports, reduce, toric, viz
 
 pv.set_jupyter_backend("static")
 
@@ -41,7 +41,7 @@ FREQS = [0.0, 100.0, 1000.0]  # Hz, roughly the frequency content of synaptic si
 # %% [markdown]
 # ## 1. TS1 reference model
 #
-# `graft.load_spine` repeats notebook 02's setup in one call: mesh and FEM
+# `toric.load_toric_spine` repeats notebook 02's setup in one call: mesh and FEM
 # model, the neck port (where the separately traced TS1 meets the
 # whole-cell mesh, tied into one electrode), and the 25 active zones (AZs)
 # snapped onto the membrane. The ports are ordered **neck first, then AZ 0
@@ -49,17 +49,17 @@ FREQS = [0.0, 100.0, 1000.0]  # Hz, roughly the frequency content of synaptic si
 
 # %%
 parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
-ts1 = graft.load_spine("TS1", "../data", parts, scale=SCALE)
-neck_port = ts1.neck_ports[0]
-port_patches = [neck_port, *ts1.az.patches]  # port 0 = neck, port k = AZ k−1
-port_names = ["neck"] + [f"AZ {i}" for i in range(len(ts1.az))]
+ts1 = toric.load_toric_spine("TS1", "../data", parts, scale=SCALE)
+neck_port = ts1.attachment_ports[0]
+port_patches = [neck_port, *ts1.sites.patches]  # port 0 = neck, port k = AZ k−1
+port_names = ["neck"] + [f"AZ {i}" for i in range(len(ts1.sites))]
 
-z_fem = cb.port_impedance(ts1.spine, MEMBRANE, port_patches, FREQS)  # (3, 26, 26) Ω
+z_fem = cb.port_impedance(ts1.network, MEMBRANE, port_patches, FREQS)  # (3, 26, 26) Ω
 zc_fem = ports.clamp_port(
     z_fem[0].real, 0
 )  # neck clamped: the spine's internal structure
 lobe = ports.electrical_groups(zc_fem, n_groups=2)  # the two lobes found in notebook 02
-print(f"{len(ts1.az)} AZs, {ts1.spine.n_nodes} FEM nodes")
+print(f"{len(ts1.sites)} AZs, {ts1.network.n_nodes} FEM nodes")
 
 # %% [markdown]
 # ## 2. Fit a tree to the port resistances
@@ -83,8 +83,8 @@ print(f"{len(ts1.az)} AZs, {ts1.spine.n_nodes} FEM nodes")
 # each subtree gets its own angular sector.
 
 # %%
-metric = ports.ResistanceMetric(ts1.spine, MEMBRANE, ground=neck_port)
-d_fem = metric.distances(ts1.az.patches)  # (26, 26) Ω, neck = port 0
+metric = ports.ResistanceMetric(ts1.network, MEMBRANE, ground=neck_port)
+d_fem = metric.distances(ts1.sites.patches)  # (26, 26) Ω, neck = port 0
 tree = reduce.fit_tree(d_fem)
 n_internal = tree.n_nodes - len(tree.port_node)
 print(
@@ -117,11 +117,13 @@ plt.show()
 # the electrode. Total membrane is conserved exactly.
 
 # %%
-owner = reduce.assign_membrane(ts1.spine, MEMBRANE, ts1.az.patches, ground=neck_port)
+owner = reduce.assign_membrane(
+    ts1.network, MEMBRANE, ts1.sites.patches, ground=neck_port
+)
 has_membrane = owner >= 0
 port_area = np.bincount(
     owner[has_membrane],
-    weights=ts1.spine.area[has_membrane],
+    weights=ts1.network.area[has_membrane],
     minlength=len(port_patches),
 )  # µm² per port, neck first
 print(

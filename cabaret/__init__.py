@@ -2,7 +2,7 @@
 
 from importlib.metadata import version
 
-from cabaret import fit, graft, jaxley_io, ports, reduce, viz
+from cabaret import fit, graft, jaxley_io, ports, reduce, toric, viz
 from cabaret.circuit import (
     CompartmentGraph,
     PortSolver,
@@ -19,6 +19,7 @@ from cabaret.circuit import (
 from cabaret.fem import FemReport, current_density, fem_model, tet_gradient
 from cabaret.io import load_axon_groups, load_mesh, load_points
 from cabaret.params import Passive
+from cabaret.reference import ReferenceModel, build_reference
 from cabaret.sites import (
     MembraneSurface,
     Sites,
@@ -38,11 +39,13 @@ __all__ = [
     "MembraneSurface",
     "Passive",
     "PortSolver",
+    "ReferenceModel",
     "Sites",
     "TetMesh",
     "add_electrode",
     "attach_sink",
     "ball_patch",
+    "build_reference",
     "current_density",
     "fem_model",
     "fit",
@@ -65,6 +68,7 @@ __all__ = [
     "tetrahedralize",
     "tetrahedralize_cached",
     "time_constants",
+    "toric",
     "transfer_impedance",
     "viz",
 ]

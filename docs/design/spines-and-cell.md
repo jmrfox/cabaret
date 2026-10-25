@@ -34,7 +34,7 @@ mesh, and how a spine's neck port is defined. Code: `cabaret/graft.py`,
 Each of the 9 spines exists twice: as a detailed TS mesh, and as a coarser
 part of `cell.obj`. The TS meshes are **not contained** in the cell mesh.
 
-**Matching** (AZ and neck-point proximity; `spine_parts` keeps parts at
+**Matching** (AZ and neck-point proximity; `graft.region_parts` keeps parts at
 least 50% covered by the TS mesh within 0.3 µm):
 
 | Spine | Cell part |
@@ -80,7 +80,8 @@ that multiport is exact when connected to *any* parent. So:
 
 The neck port is the part of the TS spine that lies **inside the cell's
 parent part, or within 0.2 µm of it**, and within 3 µm of a neck point
-(`neck_contacts`). The parent is every cell part except the spine's own.
+(`graft.attachment_contacts`, with the neck points as attachment points).
+The parent is every cell part except the spine's own.
 - Its FEM nodes, interior included, are tied into one electrode
   (`add_electrode`, κ = 10⁴ µm per tie), and their membrane is removed:
   that membrane is really the parent's interior
@@ -89,8 +90,9 @@ parent part, or within 0.2 µm of it**, and within 3 µm of a neck point
   by where the meshes overlap. The point only sets the search region.
 - Containment queries run in chunks of 2,000 points (a single query on TS24
   needed about 10 GB).
-- `load_spine` puts it together: TS mesh → tetrahedra (cached) → FEM →
-  one electrode per neck → AZ sites.
+- `toric.load_toric_spine` puts it together through the general
+  `build_reference`: TS mesh → tetrahedra (cached) → FEM → one attachment
+  electrode per neck → AZ sites. It returns a `ReferenceModel`.
 
 **TS1:** the neck electrode ties 2,044 nodes and removes 6.3 µm² of
 membrane. The traced base reaches into the parent (4.9 µm² inside).
@@ -98,5 +100,5 @@ membrane. The traced base reaches into the parent (4.9 µm² inside).
 ## Still to do (plan 004)
 
 - the tracing comparison for TS1 (TS mesh against part 17);
-- all spines through `load_spine`, with a summary table;
+- all spines through `load_toric_spine`, with a summary table;
 - grafting onto a reduced or FEM parent.

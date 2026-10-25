@@ -116,9 +116,9 @@ print(f"negative couplings carry {100 * quality.negative_fraction:.1f}% of total
 
 # %%
 parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
-own_parts = graft.spine_parts(mesh, parts)  # the cell's own tracing of TS1
+own_parts = graft.region_parts(mesh, parts)  # the cell's own tracing of TS1
 neck_points = cb.load_points("../data/TS1_neckpoint.txt", SCALE)
-(contact,) = graft.neck_contacts(
+(contact,) = graft.attachment_contacts(
     tets,
     parts,
     own_parts,

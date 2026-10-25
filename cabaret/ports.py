@@ -1,7 +1,7 @@
 """Port-level analysis: resistance distances, loopiness, rank bounds.
 
-Ports are membrane patches (synapses, necks). These functions work on the
-FEM reference model and answer two design questions:
+Ports are membrane patches or electrodes (synapses, attachments). These
+functions work on the FEM reference model and answer two design questions:
 - how far are the ports from a tree metric (could a tree reproduce them)?
 - how many compartments are needed at least, for a given error?
 """

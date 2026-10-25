@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 import cabaret as cb
-from cabaret import graft, ports, reduce
+from cabaret import graft, ports, reduce, toric
 
 SCALE = 0.005  # µm per pixel
 MEMBRANE = cb.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)  # as in notebooks 03–04
@@ -56,33 +56,33 @@ REFINED_CACHE = Path("../data/cache/TS1_e0.2_env0.005_refined.npz")
 # %%
 parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
 spines = {
-    label: graft.load_spine(
+    label: toric.load_toric_spine(
         "TS1", "../data", parts, scale=SCALE, edge_length=e, coarsen=c
     )
     for label, (e, c) in MESHES.items()
 }
 if not REFINED_CACHE.exists():
     spines["0.2"].tets.refined().save(REFINED_CACHE)
-spines[REF] = graft.load_spine(
+spines[REF] = toric.load_toric_spine(
     "TS1", "../data", parts, scale=SCALE, tets=cb.TetMesh.load(REFINED_CACHE)
 )
 
 rows = []
 for label, ts in spines.items():
     _, quality = cb.fem_model(ts.tets)
-    verts = [np.count_nonzero(p) for p in ts.az.patches]
+    verts = [np.count_nonzero(p) for p in ts.sites.patches]
     rows.append(
         {
             "mesh": label,
             "tets": ts.fidelity.n_tets,
             "vertices": ts.fidelity.n_points,
-            "surface vertices": int((ts.model.area > 0).sum()),
+            "surface vertices": int((ts.fem.area > 0).sum()),
             "area change (%)": 100 * ts.fidelity.area_error,
             "volume change (%)": 100 * ts.fidelity.volume_error,
             "negative |κ| (%)": 100 * quality.negative_fraction,
             "vertices per AZ patch (median)": np.median(verts),
             "vertices per AZ patch (min)": np.min(verts),
-            "neck electrode nodes": len(ts.contacts[0]),
+            "neck electrode nodes": len(ts.attachment_contacts[0]),
         }
     )
 pd.DataFrame(rows).set_index("mesh").round(2)
@@ -103,10 +103,12 @@ pd.DataFrame(rows).set_index("mesh").round(2)
 # %%
 results = {}
 for label, ts in spines.items():
-    neck = ts.neck_ports[0]
-    z = cb.port_impedance(ts.spine, MEMBRANE, [neck, *ts.az.patches], FREQS)
+    neck = ts.attachment_ports[0]
+    z = cb.port_impedance(ts.network, MEMBRANE, [neck, *ts.sites.patches], FREQS)
     zc = np.stack([ports.clamp_port(zk, 0) for zk in z])
-    d = ports.ResistanceMetric(ts.spine, MEMBRANE, ground=neck).distances(ts.az.patches)
+    d = ports.ResistanceMetric(ts.network, MEMBRANE, ground=neck).distances(
+        ts.sites.patches
+    )
     results[label] = {
         "z": z,
         "zc": zc,

@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import cabaret as cb
-from cabaret import fit, graft, jaxley_io, ports, reduce
+from cabaret import fit, graft, jaxley_io, ports, reduce, toric
 
 SCALE = 0.005  # µm per pixel
 MEMBRANE = cb.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)  # high-conductance, as before
@@ -37,18 +37,20 @@ FREQS = [0.0, 100.0, 1000.0]  # Hz
 
 # %%
 parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
-ts1 = graft.load_spine("TS1", "../data", parts, scale=SCALE)
-neck_port = ts1.neck_ports[0]
-port_patches = [neck_port, *ts1.az.patches]  # port 0 = neck, port k = AZ k−1
-z_fem = cb.port_impedance(ts1.spine, MEMBRANE, port_patches, FREQS)  # FEM targets
+ts1 = toric.load_toric_spine("TS1", "../data", parts, scale=SCALE)
+neck_port = ts1.attachment_ports[0]
+port_patches = [neck_port, *ts1.sites.patches]  # port 0 = neck, port k = AZ k−1
+z_fem = cb.port_impedance(ts1.network, MEMBRANE, port_patches, FREQS)  # FEM targets
 
-distances = ports.ResistanceMetric(ts1.spine, MEMBRANE, ground=neck_port)
-tree = reduce.fit_tree(distances.distances(ts1.az.patches))
-owner = reduce.assign_membrane(ts1.spine, MEMBRANE, ts1.az.patches, ground=neck_port)
+distances = ports.ResistanceMetric(ts1.network, MEMBRANE, ground=neck_port)
+tree = reduce.fit_tree(distances.distances(ts1.sites.patches))
+owner = reduce.assign_membrane(
+    ts1.network, MEMBRANE, ts1.sites.patches, ground=neck_port
+)
 has_membrane = owner >= 0
 port_area = np.bincount(
     owner[has_membrane],
-    weights=ts1.spine.area[has_membrane],
+    weights=ts1.network.area[has_membrane],
     minlength=len(port_patches),
 )
 
@@ -185,7 +187,7 @@ reduced_clamped = cb.attach_sink(
     cb.point_port(reduced_graph, int(full.tree.port_node[0])),
     resistance=NECK_SHUNT,
 )
-fem_clamped = cb.attach_sink(ts1.spine, neck_port, resistance=NECK_SHUNT)
+fem_clamped = cb.attach_sink(ts1.network, neck_port, resistance=NECK_SHUNT)
 
 zc = ports.clamp_port(z_fem[0].real, 0)
 lobe = ports.electrical_groups(zc, 2)
@@ -196,7 +198,7 @@ cases = {"closest to neck": closest, "most isolated": isolated, "other lobe": ot
 fig, axs = plt.subplots(1, 3, figsize=(13, 3.6), sharey=True)
 for ax, (label, az_i) in zip(axs, cases.items(), strict=True):
     port = az_i + 1
-    w_fem = ts1.az.patches[az_i]
+    w_fem = ts1.sites.patches[az_i]
     v_fem = cb.simulate_current(
         fem_clamped, MEMBRANE, w_fem, i_pa * 1e-12, DT_MS * 1e-3, w_fem[None]
     )[:, 0]

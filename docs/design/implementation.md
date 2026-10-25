@@ -22,8 +22,8 @@ Lengths in µm, areas in µm², volumes in µm³. Geometric conductance factors
 | `PortSolver` | `circuit` | one factorization at a frequency, reused for many port sets | implemented |
 | `MembraneSurface` | `sites` | the membrane triangles of a model, for snapping and geodesic patches | implemented |
 | `Sites` | `sites` | table of sites (position, area, `axon_id`, ...) plus their patches | implemented |
-| `TSSpine` | `graft` | a TS spine ready for analysis: mesh, tets, FEM, neck electrodes, membrane, AZ sites | implemented |
-| `ResistanceMetric` | `ports` | membrane-removed network with the neck grounded; port resistance distances | implemented |
+| `ReferenceModel` | `reference` | a region ready for analysis: surface, tets, FEM network, attachment electrodes, membrane, sites (`build_reference`) | implemented |
+| `ResistanceMetric` | `ports` | membrane-removed network with a ground port (e.g. a neck); port resistance distances | implemented |
 | `PortTree` | `reduce` | resistor tree with ports on nodes (`edges`, `resistance` Ω, `port_node`) | implemented |
 | `FitResult` | `fit` | fitted tree, node areas, loss history | implemented |
 | `JaxleyModel` | `jaxley_io` | jaxley `Cell` plus node ↔ branch maps | implemented |
@@ -49,14 +49,20 @@ cabaret/
   fem.py         P1 assembly, fem_model, gradients and current density
   circuit.py     CompartmentGraph, solvers, ports, electrodes, PortSolver
   sites.py       MembraneSurface, Sites, patches, samplers
-  graft.py       cell parts, spine matching, neck contacts, load_spine
+  reference.py   ReferenceModel, build_reference (surface → FEM, attachments, sites)
+  graft.py       cell parts, region matching, attachment contacts
   ports.py       resistance distances, loopiness, bounds, coupling, lobes
   reduce.py      PortTree, fit_tree, contract_tree, assign_membrane
   fit.py         JAX port solver, fit_tree_model
   jaxley_io.py   to_jaxley
   viz.py         PyVista and matplotlib figures
   validate.py    analytic references
+  toric.py       research module: the toric-spine dataset (load_toric_spine)
 ```
+
+The core is general: any closed surface, with attachments and sites given
+as node sets and points. Dataset conventions (file names, pixel sizes,
+how attachments are found) live in research modules such as `toric`.
 
 Planned additions: `refine.py` (loop), `scenario.py`/`activation.py`,
 `coarse.py` (field partition), `morph.py` + SWC writer.
@@ -65,22 +71,24 @@ Planned additions: `refine.py` (loop), `scenario.py`/`activation.py`,
 
 ```python
 import cabaret as cb
-from cabaret import fit, graft, jaxley_io, ports, reduce
+from cabaret import fit, graft, jaxley_io, ports, reduce, toric
 
 params = cb.Passive(r_L=100, c_m=1, g_pas=2.63e-4)  # high-conductance state
-parts = graft.load_parts(data / "neuromesh/parts", scale=0.005)
-ts1 = graft.load_spine("TS1", data, parts)  # FEM, neck electrode, AZ sites
-neck = ts1.neck_ports[0]
-patches = [neck, *ts1.az.patches]  # port 0 = neck
+parts = graft.load_parts(data / "neuromesh/parts", scale=toric.SCALE)
+ts1 = toric.load_toric_spine("TS1", data, parts)  # a ReferenceModel
+neck = ts1.attachment_ports[0]
+patches = [neck, *ts1.sites.patches]  # port 0 = neck
+
+# Any other region: cb.build_reference(surface, attachments, site_points, ...)
 
 # Characterize: port matrices, distances, bounds
-z_fem = cb.port_impedance(ts1.spine, params, patches, freqs)
-metric = ports.ResistanceMetric(ts1.spine, params, ground=neck)
-d = metric.distances(ts1.az.patches)
+z_fem = cb.port_impedance(ts1.network, params, patches, freqs)
+metric = ports.ResistanceMetric(ts1.network, params, ground=neck)
+d = metric.distances(ts1.sites.patches)
 
 # Reduce, fit, export
 tree = reduce.fit_tree(d)
-owner = reduce.assign_membrane(ts1.spine, params, ts1.az.patches, ground=neck)
+owner = reduce.assign_membrane(ts1.network, params, ts1.sites.patches, ground=neck)
 result = fit.fit_tree_model(tree, start_area, z_fem, params, freqs)
 model = jaxley_io.to_jaxley(result.tree, result.node_area, params)
 ```

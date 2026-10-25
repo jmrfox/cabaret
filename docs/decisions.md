@@ -2,6 +2,21 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-25: General reference builder; toric spines as a research module (plan 009)
+**Context:** cabaret should work for anyone with a 3D reconstruction, not
+only for toric spines. `graft.load_spine` and `TSSpine` mixed the general
+steps (mesh → FEM → electrodes → sites) with the TS dataset's file
+conventions and spine/neck/AZ vocabulary.
+**Decision:** The core gets `cabaret.build_reference` and
+`ReferenceModel`: any closed surface, with **attachments** (FEM node sets,
+or a function of the mesh that finds them) and optional site points.
+`graft` speaks of regions and attachments (`region_parts`,
+`attachment_contacts`). Toric-spine specifics live in the research module
+`cabaret.toric` (`load_toric_spine`). Fields are renamed (`spine` →
+`network`, `model` → `fem`, `neck_*` → `attachment_*`, `az` → `sites`).
+Clean break with no aliases, since nobody else uses the package yet.
+Research modules for our own projects sit beside the general core.
+
 ## 2026-10-25: Loops in jaxley through dummy compartments (plan 007)
 **Context:** In jaxley 0.14 an extra compartment edge has no conductance of
 its own: its resistance is one end's `resistive_load_out` plus the other

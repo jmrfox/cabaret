@@ -18,8 +18,9 @@ the same objects, so analyses don't change when data changes. Code:
   are presynaptic, so the points sit 0.03–0.16 µm off the spine; the snap
   tolerance is 0.25 µm, and farther points raise an error. It then builds
   the patches.
-- `graft.load_spine` does all of this for a TS spine, plus meshing and neck
-  ports.
+- `build_reference` does this for any region (`site_points`), after
+  meshing and tying its attachments into electrodes;
+  `toric.load_toric_spine` calls it with a TS spine's files.
 
 The proposed general loader (`load_sites`: CSV or Parquet with `x, y, z`,
 `psd_area`, `axon_id`, ...) is not built yet.

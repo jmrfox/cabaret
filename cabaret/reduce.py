@@ -1,7 +1,7 @@
 """Reduced models by tree realization.
 
-A spine's ports (synapses + neck) are related by resistance distances (the
-resistance between two ports with membrane removed). If those distances are
+A region's ports (synapses, attachments) are related by resistance distances
+(the resistance between two ports with membrane removed). If those distances are
 close to a **tree metric**, a tree of resistors with internal branch points
 reproduces them (see ``docs/design/reduction.md``). This
 module:
@@ -110,7 +110,7 @@ def fit_tree(d: ArrayLike) -> PortTree:
     ----------
     d : (P, P) array_like of float, in Ω
         Symmetric port distance matrix (e.g. from
-        :class:`cabaret.ports.ResistanceMetric`, neck = port 0).
+        :class:`cabaret.ports.ResistanceMetric`, ground port = port 0).
 
     Returns
     -------

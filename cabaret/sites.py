@@ -235,8 +235,9 @@ def sites_from_points(
     area : float, in µm²
         Patch area per site. The default is a placeholder, not data.
     snap_tol : float, in µm
-        Maximum distance from a point to the membrane. AZ points lie up to
-        about 0.16 µm off the TS meshes (presynaptic side).
+        Maximum distance from a point to the membrane. Synapse positions
+        traced on the presynaptic side lie slightly off the membrane (up to
+        about 0.16 µm in the toric-spine data).
     axon_groups : list of list of int, optional
         0-based point indices per axon (see :func:`cabaret.io.load_axon_groups`).
     source : str

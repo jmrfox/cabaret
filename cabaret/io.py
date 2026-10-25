@@ -33,13 +33,13 @@ def load_mesh(path: Path, scale: float = 1.0) -> trimesh.Trimesh:
 
 
 def load_points(path: Path, scale: float = 1.0) -> NDArray[np.float64]:
-    """Load whitespace-separated ``x y z`` points (AZ or neck-point files).
+    """Load whitespace-separated ``x y z`` points, e.g. synapse positions.
 
     Parameters
     ----------
     path : pathlib.Path
     scale : float
-        Factor that converts file units to µm (0.005 for the TS data).
+        Factor that converts file units to µm.
 
     Returns
     -------
