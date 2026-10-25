@@ -222,18 +222,23 @@ $d_{ij} = R_{ii} + R_{jj} - 2R_{ij}$. Tree realization starts from it
 | P1 gradient of a linear field | exact (test) |
 | Torus | current splits around the hole as expected; four-point violation behaves as predicted (notebook 01) |
 | Reduced TS1 model against FEM | EPSP peaks within 0.2% at three synapses (notebook 04) |
-| TS1 mesh convergence, 0.2 µm mesh vs its uniform refinement (notebook 05) | isolated port matrix 0.02%; neck-clamped port matrix 1.3%; spine-local R_in 1.2% low on average, 1.3% median, 5.0% max (AZ 8) |
+| TS1 mesh convergence, 0.2 µm vs 0.05 µm fTetWild mesh (notebook 05) | neck-clamped port matrix 1.1%; spine-local R_in 1.1% low on average, 1.0% median, 4.1% max; isolated R_in 0.5% |
 
 **TS1 mesh convergence** (plan 008, notebook 05):
-- fTetWild's target edge length barely changes the mesh: 0.2 → 0.1 µm
-  adds only 38% more vertices, since the 0.005 µm envelope already sets the
-  surface resolution. Uniform refinement (`TetMesh.refined`) is what
-  actually resolves it.
-- Against the refined mesh (223k vertices), the fTetWild meshes converge:
-  median spine-local R_in error 4.4% (`coarsen`), 1.3% (0.2 µm), 0.84%
-  (0.14), 0.55% (0.1). AZs 7–8 stay 4–5% low on all of them.
-- Whether the refined mesh has itself converged is not yet shown; the next
-  uniform level (about 1.7M vertices) needs an iterative solver.
+- fTetWild's target edge length is a weak knob: 0.2 → 0.1 µm adds only 38%
+  more vertices (34k → 47k), since the 0.005 µm envelope already sets the
+  surface resolution. 0.05 µm gives 154k vertices and takes about 40
+  minutes to mesh.
+- Against the 0.05 µm mesh, the 0.2 µm mesh reads spine-local R_in 1.1% low
+  on average (4.1% max) and the neck-clamped matrix 1.1% off; 0.1 µm is
+  0.7% low (2.8% max).
+- The edge-length series alone does not converge cleanly (0.2 → 0.1 and
+  0.1 → 0.05 each change 0.8% median), partly because each fTetWild run
+  moves the surface (area −0.80% to −1.04%).
+- Two independently built fine meshes, 0.05 µm and the 0.2 µm mesh refined
+  uniformly (`TetMesh.refined`, 223k vertices), agree to 0.34% median and
+  0.44% on the clamped matrix. So a fine mesh of either kind is good to a
+  few tenths of a percent, and the 0.2 µm mesh is about 1% off.
 - The other spines are still to do ([validation.md](validation.md)).
 
 ## 8. Limitations

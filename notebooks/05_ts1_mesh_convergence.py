@@ -11,15 +11,17 @@
 # and the spine-local input resistance at each synapse are exactly what the
 # reduction is fitted to.
 #
-# **Meshes.**
-# - fTetWild with target edge 0.2, 0.14 and 0.1 µm, and 0.2 µm with its
-#   `coarsen` option. The envelope is 0.005 µm throughout.
-# - **The reference:** the 0.2 µm mesh refined uniformly (every tetrahedron
-#   split into eight, `TetMesh.refined`). Its boundary is the same surface,
-#   so only the resolution changes.
+# **Meshes.** fTetWild is rerun from the reconstruction with target edge
+# 0.2, 0.1 and 0.05 µm (envelope 0.005 µm throughout). Each run makes a new
+# mesh, so the surface moves slightly (within the envelope) as well as the
+# resolution: the test is of the whole meshing step. The 0.05 µm mesh is the
+# reference. For comparison, the 0.2 µm mesh refined uniformly (every
+# tetrahedron split into eight, `TetMesh.refined`) changes resolution only.
 #
-# Meshing takes a few minutes per mesh the first time; the results are
-# cached in `../data/cache/`.
+# Meshing the 0.05 µm mesh takes about 40 minutes the first time; meshes
+# are cached in `../data/cache/`. The solves on the two fine meshes take
+# tens of minutes (about an hour with three frequencies, before this was cut
+# to DC).
 
 # %%
 from pathlib import Path
@@ -33,14 +35,10 @@ from cabaret import graft, ports, reduce, toric
 
 SCALE = 0.005  # µm per pixel
 MEMBRANE = cb.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)  # as in notebooks 03–04
-FREQS = [0.0, 100.0, 1000.0]  # Hz
-MESHES = {  # fTetWild meshes, label: (edge length in µm, coarsen)
-    "0.2 coarse": (0.2, True),
-    "0.2": (0.2, False),
-    "0.14": (0.14, False),
-    "0.1": (0.1, False),
-}
-REF = "0.2 refined"
+FREQS = [0.0]  # Hz; 100 Hz and 1 kHz gave the same clamped errors (plan 008)
+EDGES = {"0.2": 0.2, "0.1": 0.1, "0.05": 0.05}  # fTetWild target edge, µm
+REF = "0.05"
+REFINED = "0.2 refined"
 REFINED_CACHE = Path("../data/cache/TS1_e0.2_env0.005_refined.npz")
 
 # %% [markdown]
@@ -56,14 +54,12 @@ REFINED_CACHE = Path("../data/cache/TS1_e0.2_env0.005_refined.npz")
 # %%
 parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
 spines = {
-    label: toric.load_toric_spine(
-        "TS1", "../data", parts, scale=SCALE, edge_length=e, coarsen=c
-    )
-    for label, (e, c) in MESHES.items()
+    label: toric.load_toric_spine("TS1", "../data", parts, scale=SCALE, edge_length=e)
+    for label, e in EDGES.items()
 }
 if not REFINED_CACHE.exists():
     spines["0.2"].tets.refined().save(REFINED_CACHE)
-spines[REF] = toric.load_toric_spine(
+spines[REFINED] = toric.load_toric_spine(
     "TS1", "../data", parts, scale=SCALE, tets=cb.TetMesh.load(REFINED_CACHE)
 )
 
@@ -92,8 +88,9 @@ pd.DataFrame(rows).set_index("mesh").round(2)
 #
 # Ports are ordered neck first, then AZ 0 to AZ 24, as in notebooks 03–04.
 # For each mesh:
-# - the port matrices at DC, 100 Hz and 1 kHz, isolated and with the neck
-#   clamped;
+# - the DC port matrices, isolated and with the neck clamped (at 100 Hz and
+#   1 kHz the neck-clamped errors were the same to 0.01%, so they are left
+#   out to save time);
 # - the **spine-local input resistance** of each AZ: the diagonal of the
 #   neck-clamped DC matrix;
 # - the **isolated input resistance** of each AZ: the diagonal of the
@@ -118,11 +115,11 @@ for label, ts in spines.items():
     }
 
 # %% [markdown]
-# ## 3. Errors against the refined mesh
+# ## 3. Errors against the 0.05 µm mesh
 #
-# Relative errors against the uniformly refined 0.2 µm mesh. Matrix errors are relative
-# Frobenius norms (`port_matrix_error`), per frequency; per-AZ quantities
-# give the median and the largest error over the 25 AZs.
+# Relative errors against the 0.05 µm mesh. Matrix errors are relative
+# Frobenius norms (`port_matrix_error`); per-AZ quantities give the median,
+# the largest and the mean signed error over the 25 AZs.
 
 # %%
 ref = results[REF]
@@ -145,6 +142,7 @@ for label, r in results.items():
         e = rel(r[key], ref[key])
         row[f"{name}: median (%)"] = 100 * np.median(e)
         row[f"{name}: max (%)"] = 100 * e.max()
+        row[f"{name}: mean signed (%)"] = 100 * np.mean(r[key] / ref[key] - 1)
     for k, f in enumerate(FREQS):
         row[f"clamped Z @ {f:g} Hz (%)"] = 100 * reduce.port_matrix_error(
             r["zc"][k], ref["zc"][k]
@@ -156,10 +154,29 @@ for label, r in results.items():
 pd.DataFrame(rows).set_index("mesh").T.round(2)
 
 # %% [markdown]
+# **Successive differences.** If the 0.2 → 0.1 change is clearly larger
+# than 0.1 → 0.05, the meshing is converging and 0.05 µm is a fair
+# reference.
+
+# %%
+steps = [("0.2", "0.1"), ("0.1", "0.05")]
+pd.DataFrame(
+    {
+        f"{a} → {b}": {
+            "spine-local R_in, median (%)": 100
+            * np.median(rel(results[a]["r_local"], results[b]["r_local"])),
+            "spine-local R_in, max (%)": 100
+            * rel(results[a]["r_local"], results[b]["r_local"]).max(),
+            "clamped Z @ DC (%)": 100
+            * reduce.port_matrix_error(results[a]["zc"][0], results[b]["zc"][0]),
+        }
+        for a, b in steps
+    }
+).round(2)
+
+# %% [markdown]
 # **Per AZ.** Spine-local input resistance error of each AZ against the
-# refined mesh (left), and the median error against mesh size (right).
-# Changing fTetWild's target edge length barely changes the vertex count,
-# because the tight envelope already sets the surface resolution.
+# 0.05 µm mesh (left), and the median error against mesh size (right).
 
 # %%
 fig, axs = plt.subplots(1, 2, figsize=(11, 4))
@@ -168,7 +185,7 @@ for label, r in results.items():
         axs[0].plot(100 * (r["r_local"] / ref["r_local"] - 1), "o-", label=label)
 axs[0].axhline(0, color="k", lw=0.5)
 axs[0].set_xlabel("AZ")
-axs[0].set_ylabel("spine-local R_in error vs refined (%)")
+axs[0].set_ylabel("spine-local R_in error vs 0.05 µm (%)")
 axs[0].legend()
 labels = [m for m in results if m != REF]
 n = [spines[m].fidelity.n_points for m in labels]
@@ -183,25 +200,23 @@ plt.tight_layout()
 # %% [markdown]
 # ## 4. Reading
 #
-# - **fTetWild's edge length is a weak knob.** Halving the target from 0.2
-#   to 0.1 µm adds only 38% more vertices: the 0.005 µm envelope already
-#   forces fine surface elements. Uniform refinement is the way to actually
-#   resolve the mesh further.
-# - **Isolated quantities have converged** (under 0.05% on every mesh):
-#   they are set by the total membrane.
-# - **The neck-clamped quantities, which the reduction is fitted to, have
-#   not.** The 0.2 µm mesh used in notebooks 02–04 reads the spine-local
-#   input resistance 1.2% low on average (1.3% median, 5.0% at AZ 8), and
-#   the neck-clamped port matrix is 1.3% off. Coarse meshes read low, as P1
-#   elements are too conductive when under-resolved.
-# - **AZs 7 and 8 are the hard spot.** They are about 4–5% low on every
-#   fTetWild mesh and only resolved by refinement, so a thin feature near
-#   them is under-resolved at this surface resolution.
-# - **`coarsen` costs too much accuracy** (4.4% median, 10% max).
-# - **The refined mesh is affordable** (223k vertices; about 30 s for all 26
-#   ports at DC, 12 minutes for this whole notebook), but whether it has
-#   itself converged is not shown here: the next uniform level (about 1.7M
-#   vertices) needs an iterative solver.
+# - **At 0.2 µm, the reference is about 1% low where it matters.** Against
+#   the 0.05 µm mesh, spine-local input resistance is 1.1% low on average
+#   (1.0% median, 4.1% max at AZ 12), and the neck-clamped port matrix is
+#   1.1% off. At 0.1 µm: 0.7% low, 0.8% median, 2.8% max.
+# - **The edge-length series alone does not show convergence.** The step
+#   0.1 → 0.05 changes as much as 0.2 → 0.1 (0.8% median each). Part of it
+#   is geometry: every rerun of fTetWild moves the surface a little (area
+#   −0.80% at 0.2 µm, −1.04% at 0.05 µm), and the isolated input resistance,
+#   which follows total membrane, shifts by 0.5%.
+# - **The two fine meshes agree.** The 0.05 µm mesh and the uniformly
+#   refined 0.2 µm mesh are built differently but differ by only 0.34%
+#   (median) and 0.44% on the clamped matrix, with no systematic offset
+#   (+0.14% mean). So the remaining spread between fine meshes is a few
+#   tenths of a percent, mostly from surface differences, while the 0.2 µm
+#   mesh's own error is about 1%.
+# - **AZs 7–8** are 3–3.5% low at 0.2 µm and within 2% between the fine
+#   meshes.
 #
-# For comparison, the tree's own floor is 2.8% on the neck-clamped matrix
-# (notebook 04), so mesh error at 0.2 µm is not negligible next to it.
+# For comparison, the tree's floor is 2.8% on the neck-clamped matrix
+# (notebook 04): a 0.2 µm reference adds about 1% to every comparison.

@@ -70,3 +70,25 @@ are exactly what the tree and the fit are matched to.
 - Results: see notebook 05, section 4, and fem-reference.md section 7.
 - Notebook 05 takes about 12 minutes, mostly the refined mesh's complex
   factorizations at 100 Hz and 1 kHz.
+
+## Follow-up: edge-length series (2026-10-25)
+
+At the user's request the check was redone by rerunning fTetWild at 0.2,
+0.1 and 0.05 µm (geometry and resolution change together), with the 0.05
+µm mesh as the reference and the uniformly refined 0.2 µm mesh as a
+cross-check.
+
+- 0.05 µm: 154k vertices, 754k tets, area −1.04%, 15.5k neck electrode
+  nodes, 37 minutes to mesh.
+- Against it: 0.2 µm is 1.1% low on spine-local R_in (1.0% median, 4.1%
+  max at AZ 12), clamped matrix 1.1%; 0.1 µm 0.7% low (0.8% median, 2.8%
+  max), clamped 0.85%.
+- Successive steps 0.2 → 0.1 and 0.1 → 0.05 each change 0.8% (median), so
+  the series by itself does not show convergence; isolated R_in shifts
+  0.5%, which points to the surface moving between fTetWild runs.
+- The refined 0.2 µm mesh agrees with the 0.05 µm mesh to 0.34% median,
+  2.0% max (AZ 8), 0.44% clamped, +0.14% mean: two independently built
+  fine meshes agree to a few tenths of a percent.
+- At 100 Hz and 1 kHz the clamped errors equal the DC ones to 0.01%, so
+  notebook 05 now computes DC only. With three frequencies the notebook
+  took 58 minutes.
