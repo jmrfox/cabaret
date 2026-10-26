@@ -37,6 +37,7 @@ change, propose a short plan first.
 cabaret/   package source
 tests/          pytest tests (kept small, see tests/AGENTS.md)
 notebooks/      jupytext-paired notebooks (see notebooks/AGENTS.md)
+scripts/        long-running studies; save results for notebooks to load
 data/           local data, gitignored except data/README.md
 docs/           design/, plans/, decisions.md
 ```

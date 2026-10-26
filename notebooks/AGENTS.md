@@ -33,5 +33,8 @@ Then create the `.ipynb` with `uv run jupytext --sync notebooks/01_explore_data.
   extend it. Anything reusable (more than a few lines, or used twice) goes into the
   package and is imported from there.
 - They must run top to bottom in a fresh kernel, with no reliance on cell execution order.
+- Notebooks are demos: keep each to a few minutes of compute (5 at most). Anything
+  heavier (fine meshes, big parameter sweeps) goes into `scripts/`, which saves
+  results to `data/cache/`. The notebook then loads them and says how to regenerate them.
 - Put imports in the first code cell. Load data with relative paths such as `../data/...`.
 - Keep markdown short: say what each section shows and what to notice.

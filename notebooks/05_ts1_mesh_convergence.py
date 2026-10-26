@@ -18,28 +18,30 @@
 # reference. For comparison, the 0.2 µm mesh refined uniformly (every
 # tetrahedron split into eight, `TetMesh.refined`) changes resolution only.
 #
-# Meshing the 0.05 µm mesh takes about 40 minutes the first time; meshes
-# are cached in `../data/cache/`. The solves on the two fine meshes take
-# tens of minutes (about an hour with three frequencies, before this was cut
-# to DC).
+# **Saved results.** Meshing and solving take tens of minutes (about 40
+# more the first time the 0.05 µm mesh is built), too long for a notebook.
+# They run in a script, and this notebook only loads the saved results.
+# To regenerate them, from the repository root:
+#
+# ```
+# uv run python scripts/ts1_mesh_convergence.py data
+# ```
 
 # %%
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-import cabaret as cb
-from cabaret import graft, ports, reduce, toric
+from cabaret import reduce
 
-SCALE = 0.005  # µm per pixel
-MEMBRANE = cb.Passive(r_L=100.0, c_m=1.0, g_pas=2.63e-4)  # as in notebooks 03–04
-FREQS = [0.0]  # Hz; 100 Hz and 1 kHz gave the same clamped errors (plan 008)
-EDGES = {"0.2": 0.2, "0.1": 0.1, "0.05": 0.05}  # fTetWild target edge, µm
+RESULTS = "../data/cache/ts1_mesh_convergence.npz"  # from the script above
 REF = "0.05"
-REFINED = "0.2 refined"
-REFINED_CACHE = Path("../data/cache/TS1_e0.2_env0.005_refined.npz")
+
+saved = np.load(RESULTS)
+labels = [str(s) for s in saved["labels"]]
+FREQS = saved["freqs"]  # Hz; DC only, since 100 Hz and 1 kHz matched (plan 008)
+QUANTITIES = ["z", "zc", "r_local", "r_iso", "r_neck"]
+results = {m: {q: saved[f"{m}/{q}"] for q in QUANTITIES} for m in labels}
 
 # %% [markdown]
 # ## 1. The meshes
@@ -52,42 +54,18 @@ REFINED_CACHE = Path("../data/cache/TS1_e0.2_env0.005_refined.npz")
 # barely resolved and its spreading resistance is set by the mesh.
 
 # %%
-parts = graft.load_parts("../data/neuromesh/parts", scale=SCALE)
-spines = {
-    label: toric.load_toric_spine("TS1", "../data", parts, scale=SCALE, edge_length=e)
-    for label, e in EDGES.items()
-}
-if not REFINED_CACHE.exists():
-    spines["0.2"].tets.refined().save(REFINED_CACHE)
-spines[REFINED] = toric.load_toric_spine(
-    "TS1", "../data", parts, scale=SCALE, tets=cb.TetMesh.load(REFINED_CACHE)
+meshes = pd.DataFrame(
+    saved["mesh_table"],
+    index=pd.Index(labels, name="mesh"),
+    columns=[str(c) for c in saved["mesh_columns"]],
 )
-
-rows = []
-for label, ts in spines.items():
-    _, quality = cb.fem_model(ts.tets)
-    verts = [np.count_nonzero(p) for p in ts.sites.patches]
-    rows.append(
-        {
-            "mesh": label,
-            "tets": ts.fidelity.n_tets,
-            "vertices": ts.fidelity.n_points,
-            "surface vertices": int((ts.fem.area > 0).sum()),
-            "area change (%)": 100 * ts.fidelity.area_error,
-            "volume change (%)": 100 * ts.fidelity.volume_error,
-            "negative |κ| (%)": 100 * quality.negative_fraction,
-            "vertices per AZ patch (median)": np.median(verts),
-            "vertices per AZ patch (min)": np.min(verts),
-            "neck electrode nodes": len(ts.attachment_contacts[0]),
-        }
-    )
-pd.DataFrame(rows).set_index("mesh").round(2)
+meshes.round(2)
 
 # %% [markdown]
 # ## 2. Port quantities on each mesh
 #
 # Ports are ordered neck first, then AZ 0 to AZ 24, as in notebooks 03–04.
-# For each mesh:
+# The script computes, for each mesh:
 # - the DC port matrices, isolated and with the neck clamped (at 100 Hz and
 #   1 kHz the neck-clamped errors were the same to 0.01%, so they are left
 #   out to save time);
@@ -96,23 +74,6 @@ pd.DataFrame(rows).set_index("mesh").round(2)
 # - the **isolated input resistance** of each AZ: the diagonal of the
 #   isolated DC matrix (dominated by the total membrane);
 # - the resistance from the neck to each AZ, with the membrane removed.
-
-# %%
-results = {}
-for label, ts in spines.items():
-    neck = ts.attachment_ports[0]
-    z = cb.port_impedance(ts.network, MEMBRANE, [neck, *ts.sites.patches], FREQS)
-    zc = np.stack([ports.clamp_port(zk, 0) for zk in z])
-    d = ports.ResistanceMetric(ts.network, MEMBRANE, ground=neck).distances(
-        ts.sites.patches
-    )
-    results[label] = {
-        "z": z,
-        "zc": zc,
-        "r_local": np.diag(zc[0].real),
-        "r_iso": np.diag(z[0].real)[1:],
-        "r_neck": d[0, 1:],
-    }
 
 # %% [markdown]
 # ## 3. Errors against the 0.05 µm mesh
@@ -188,7 +149,7 @@ axs[0].set_xlabel("AZ")
 axs[0].set_ylabel("spine-local R_in error vs 0.05 µm (%)")
 axs[0].legend()
 labels = [m for m in results if m != REF]
-n = [spines[m].fidelity.n_points for m in labels]
+n = [meshes.loc[m, "vertices"] for m in labels]
 e = [100 * np.median(rel(results[m]["r_local"], ref["r_local"])) for m in labels]
 axs[1].semilogx(n, e, "o")
 for m, x, y in zip(labels, n, e, strict=True):

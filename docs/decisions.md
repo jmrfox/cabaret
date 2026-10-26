@@ -2,6 +2,18 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-26: Long studies run as scripts; notebooks load saved results
+**Context:** Notebook 05 (TS1 mesh convergence) needs tens of minutes of
+solves on fine meshes, plus about 40 minutes to mesh at 0.05 µm the first
+time. Notebooks are demos and should stay short.
+**Decision:** A new top-level `scripts/` folder holds long-running studies.
+Each script takes paths as arguments and saves results to `data/cache/`.
+`scripts/ts1_mesh_convergence.py` does notebook 05's meshing and solves, and
+the notebook loads its `.npz`. The study code is TS1-specific and runs
+once, so it stays in a script rather than in the package. The notebook
+rules (`notebooks/AGENTS.md`) now cap a notebook at a few minutes of
+compute.
+
 ## 2026-10-26: Demo notebooks stay on the 0.2 µm mesh (plan 008)
 **Context:** On the 0.05 µm mesh, notebook 03 took 53 minutes and notebook
 04's first working cell took 42 minutes, mostly in the complex sparse LU at

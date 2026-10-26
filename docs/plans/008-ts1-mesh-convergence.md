@@ -123,6 +123,7 @@ point to notebook 05. Work done before the revert:
       (the 0.2 µm numbers stay).
 - [x] Notebooks 03–04 note the 0.2 µm mesh error and that the tree's
       roughly 3% error is the same against the 0.05 µm FEM.
-- [ ] Notebook 05 breaks the 5-minute demo budget (40 min to mesh at
-      0.05 µm, tens of minutes of solves). Left as is for now; later, move
-      the solves into a script that saves results for the notebook to load.
+- [x] Notebook 05 broke the 5-minute demo budget (40 min to mesh at
+      0.05 µm, tens of minutes of solves). The meshing and solves now run in
+      `scripts/ts1_mesh_convergence.py`, which saves
+      `data/cache/ts1_mesh_convergence.npz`; the notebook loads it.
