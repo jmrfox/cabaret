@@ -211,6 +211,13 @@ print(
 # input resistance to well under 1%. The loops of TS1 are absent from this
 # model, and it barely matters: they act through the resistances they create,
 # which the tree has absorbed.
+#
+# **Mesh error.** These are errors against the FEM on a 0.2 µm mesh. That
+# reference reads spine-local input resistance about 1% low compared with a
+# 0.05 µm mesh (notebook 05). Built from the 0.05 µm FEM instead, the
+# tree gives nearly the same errors: 3.0% clamped (2.8% here), spine-local
+# median 0.31% (0.29% here). The roughly 3% error comes from the tree, not
+# the mesh.
 
 # %% [markdown]
 # ## 5. Smaller models: accuracy against size

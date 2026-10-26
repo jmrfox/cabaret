@@ -1,6 +1,6 @@
 # 008: TS1 mesh convergence
 
-**Status:** done
+**Status:** active (paused 2026-10-25: switching notebooks 02–04)
 **Design sections:** [fem-reference.md](../design/fem-reference.md)
 (sections 6–8, meshing, validation, limits), [validation.md](../design/validation.md)
 (mesh refinement), open question 10 in [open-questions.md](../design/open-questions.md)
@@ -92,3 +92,37 @@ cross-check.
 - At 100 Hz and 1 kHz the clamped errors equal the DC ones to 0.01%, so
   notebook 05 now computes DC only. With three frequencies the notebook
   took 58 minutes.
+
+## Switching notebooks 02–04 to the 0.05 µm mesh (reverted)
+
+Decided 2026-10-25, reverted 2026-10-26 (decisions.md): the demo notebooks
+stay on the 0.2 µm mesh, and notebooks 03–04 say how large its error is and
+point to notebook 05. Work done before the revert:
+
+- [x] Notebooks 02–04 loaded the 0.05 µm mesh (`EDGE = 0.05`), never
+      committed; now back on 0.2 µm.
+- [x] Notebook 03 rerun headless (53 minutes): fit error 1.42% (was 1.35%),
+      neck-clamped error 3.00% at all frequencies (was 2.83%), isolated
+      0.24% at DC (was 0.01%), spine-local R_in median 0.31%, max 8.1% (was
+      0.29%, 7.6%), diagonal + low-rank bound m=8 1.3%, m=12 0.4%. Its FEM
+      node count in the text is updated; the "about 3%" wording still holds.
+- [x] Notebook 04 rerun: dropped with the revert. Two attempts stalled before printing anything
+      past the first cell; the first sat at ~0% CPU with 6.4 GB held. Not
+      diagnosed. Suspects: `attachment_contacts` on the fine mesh (15.5k
+      contact nodes; its containment tests are slow), or the headless
+      plotting. Next step: time `load_toric_spine(edge_length=0.05)` alone,
+      and consider caching the contacts with the mesh.
+      Diagnosed 2026-10-26: not a hang. Cell 2 alone takes 42 minutes, and
+      a headless run prints nothing until the cell finishes. Timings:
+      `load_toric_spine` 96 s (contacts 80 s), `port_impedance` 2.3 min at
+      DC but about 17 min each at 100 Hz and 1 kHz (complex LU),
+      `ResistanceMetric` 2 min, `assign_membrane` 2 min. Peak memory 2.9 GB
+      in a script. One sparse LU uses one core, which shows as about 6% CPU
+      on this 16-core machine.
+- [x] Notebook 02 rerun and TS1 number updates: dropped with the revert
+      (the 0.2 µm numbers stay).
+- [x] Notebooks 03–04 note the 0.2 µm mesh error and that the tree's
+      roughly 3% error is the same against the 0.05 µm FEM.
+- [ ] Notebook 05 breaks the 5-minute demo budget (40 min to mesh at
+      0.05 µm, tens of minutes of solves). Left as is for now; later, move
+      the solves into a script that saves results for the notebook to load.

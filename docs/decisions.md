@@ -2,6 +2,34 @@
 
 A short log of design choices, new dependencies and changes of direction. Newest first.
 
+## 2026-10-26: Demo notebooks stay on the 0.2 µm mesh (plan 008)
+**Context:** On the 0.05 µm mesh, notebook 03 took 53 minutes and notebook
+04's first working cell took 42 minutes, mostly in the complex sparse LU at
+100 Hz and 1 kHz (about 17 minutes each).
+**Decision:** Reverses the entry below. Notebooks 02–04 use the 0.2 µm mesh.
+At this stage larger errors are fine as long as they are explained and
+convergence is shown. Notebook 05 shows the 0.2 µm mesh is about 1% off.
+Notebook 03 reports that the tree's roughly 3% error is the same against
+the 0.05 µm FEM (3.0% against 2.8%). Demo notebooks should not need more
+than about 5 minutes of compute. Heavy studies go into scripts or are run
+later, with saved results.
+
+## 2026-10-25: TS1 reference mesh is the 0.05 µm fTetWild mesh (plan 008)
+**Context:** The mesh study (notebook 05) showed the 0.2 µm mesh used in
+notebooks 02–04 reads spine-local input resistance about 1.1% low (4.1% at
+worst) and the neck-clamped port matrix 1.1% off, against a 0.05 µm mesh.
+That is not small next to the tree's 2.8% floor. Two fine meshes (0.05 µm,
+and the 0.2 µm mesh refined uniformly) agree to 0.34% median.
+**Decision:** TS1's reference is the fTetWild mesh at edge 0.05 µm,
+envelope 0.005 µm (154k vertices), in notebooks 02–04. Remeshing was
+preferred over uniform refinement because it tests the whole meshing step,
+surface included, rather than resolution alone. Both stay within the same
+envelope (area change −1.04% at 0.05 µm, −0.80% at 0.2 µm). Cost: about
+40 minutes to mesh (cached) and slower FEM solves. `load_toric_spine`
+keeps its 0.2 µm default, so callers choose the resolution explicitly.
+Rejected: the uniformly refined 0.2 µm mesh (3 s to build, same answers to
+0.3–0.4%).
+
 ## 2026-10-25: General reference builder; toric spines as a research module (plan 009)
 **Context:** cabaret should work for anyone with a 3D reconstruction, not
 only for toric spines. `graft.load_spine` and `TSSpine` mixed the general

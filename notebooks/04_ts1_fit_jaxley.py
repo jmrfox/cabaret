@@ -248,6 +248,10 @@ plt.show()
 # - A loop-free tree has an accuracy floor of about **3%** for TS1: the
 #   electrical cost of the holes. A model with real loops would be needed
 #   to go below it.
+# - All errors are against the FEM on a 0.2 µm mesh, which itself reads
+#   spine-local input resistance about 1% low (notebook 05). That error is
+#   in the reference, not in the reduction: notebook 03's tree reaches about
+#   3% against both the 0.2 and the 0.05 µm FEM.
 # - **Fitting matters for small models.** Merged-then-fitted trees reach
 #   about 6–7% with 21–26 compartments, against 11–12% unfitted. Below about
 #   20 compartments the error grows quickly with this simple

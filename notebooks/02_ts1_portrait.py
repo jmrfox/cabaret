@@ -53,7 +53,7 @@ pv.set_jupyter_backend("static")  # 3D views as static images in the notebook
 # | `PSD_AREA` | 0.05 µm² | **Placeholder** synapse patch area. PSD sizes were not measured in the EM data |
 # | `CONTACT_DISTANCE` | 0.2 µm | How close TS1's surface must come to the whole-cell mesh to count as attached. It allows for mismatch between the two tracings (AZ points sit 0.03–0.1 µm off TS1, neck points 0.1–0.45 µm off the cell) |
 # | `CONTACT_RADIUS` | 3 µm | Contacts are only searched for this close to the neck point, so places where the spine merely lies against other cell parts are ignored |
-# | `EDGE`, `ENVELOPE` | 0.2 µm, 0.005 µm | Tetrahedron size, and how far the meshed surface may move from the reconstruction. The envelope is kept far below the thinnest neck radius (about 0.06 µm) |
+# | `EDGE`, `ENVELOPE` | 0.2 µm, 0.005 µm | Tetrahedron size, and how far the meshed surface may move from the reconstruction. The envelope is kept far below the thinnest neck radius (about 0.06 µm). At 0.2 µm, spine-local quantities read about 1% low against a 0.05 µm mesh (notebook 05). The finer mesh takes about 40 minutes to build, too slow for a demo |
 # | `rng` | seed 0 | Random generator for the null models, so results are reproducible |
 #
 # There is no parent placeholder: the spine is characterized on its own.
@@ -88,7 +88,10 @@ rng = np.random.default_rng(0)
 # %%
 mesh = cb.load_mesh("../data/TS1.obj", scale=SCALE)
 tets, fidelity = cb.tetrahedralize_cached(
-    mesh, "../data/cache/TS1_e0.2_env0.005.npz", edge_length=EDGE, envelope=ENVELOPE
+    mesh,
+    f"../data/cache/TS1_e{EDGE:g}_env{ENVELOPE:g}.npz",
+    edge_length=EDGE,
+    envelope=ENVELOPE,
 )
 model, quality = cb.fem_model(tets)  # FEM network (one node per mesh vertex)
 
